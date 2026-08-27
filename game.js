@@ -174,7 +174,7 @@
   launchButton.addEventListener('click', () => {
     if (running) return;
     resetCollectibles();
-    pieces().forEach(p => p.hits = 0);
+    pieces().forEach(p => { p.hits = 0; p.tired = false; });
     selectedId = null;
     ball = { x: 92, y: 270, vx: 290, vy: -52, radius: 18, trail: [], age: 0 };
     running = true; simulationAccumulator = 0; launchButton.disabled = true;
@@ -182,6 +182,7 @@
   });
 
   function collidePiece(piece) {
+    if (piece.tired) return;
     const s = segment(piece);
     const vx = s.bx - s.ax, vy = s.by - s.ay;
     const len2 = vx * vx + vy * vy;
@@ -220,10 +221,8 @@
     piece.hits++;
     sound(piece.type === 'spring' ? 'spring' : 'bounce');
     if (piece.hits >= 8) {
-      const index = pieces().indexOf(piece);
-      if (index >= 0) pieces().splice(index, 1);
+      piece.tired = true;
       setMessage('A tired piece gave way', 'Long loops need a more durable route.');
-      updateTools();
     }
   }
 
@@ -347,6 +346,7 @@
   function drawPiece(piece) {
     const s = segment(piece);
     ctx.save();
+    if (piece.tired) ctx.globalAlpha = .25;
     ctx.lineCap = 'round';
     ctx.strokeStyle = piece.id === selectedId ? '#fff7d0' : piece.type === 'spring' ? '#e4a03c' : '#244f48';
     ctx.lineWidth = piece.type === 'spring' ? 20 : 15;
