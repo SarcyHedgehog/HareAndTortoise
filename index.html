@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#173b3a">
+  <meta name="description" content="A playable prototype of Hare and Tortoise, a two-sided contraption puzzle.">
+  <title>Hare &amp; Tortoise — Prototype</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="shell">
+    <header class="masthead">
+      <div class="brand">
+        <span class="eyebrow">SARCASTIC HEDGEHOG · 2012 / 2026</span>
+        <h1>Hare <i>&amp;</i> Tortoise</h1>
+        <p>Sometimes it’s better to enjoy the journey.</p>
+      </div>
+      <div class="characters" aria-hidden="true">
+        <span class="hare">🐇</span><span class="trackline"></span><span class="tortoise">🐢</span>
+      </div>
+    </header>
+
+    <section class="game-card">
+      <div class="mode-row" role="group" aria-label="Choose a challenge">
+        <button class="mode active" data-mode="hare">
+          <span>🐇</span><strong>The Hare</strong><small>Reach the goal quickly</small>
+        </button>
+        <button class="mode" data-mode="tortoise">
+          <span>🐢</span><strong>The Tortoise</strong><small>Take the scenic route</small>
+        </button>
+        <div class="scoreboard">
+          <span id="objective">FASTEST SUCCESSFUL RUN</span>
+          <strong id="clock">0.00s</strong>
+          <small id="best">Best —</small>
+        </div>
+      </div>
+
+      <div class="workbench">
+        <div class="canvas-wrap">
+          <canvas id="game" width="1100" height="620" aria-label="Contraption construction board"></canvas>
+          <div id="message" class="message">
+            <strong>Training Meadow</strong>
+            <span>Adjust the course, then launch the sphere.</span>
+          </div>
+        </div>
+
+        <aside class="toolbox" aria-label="Construction pieces">
+          <div class="toolbox-title"><span>THE TOOL SHED</span><small id="remaining">8 pieces available</small></div>
+          <button class="tool selected" data-tool="select"><b>↖</b><span>Select</span><small>move a piece</small></button>
+          <button class="tool" data-tool="platform"><b>━</b><span>Platform</span><small><em id="count-platform">4</em> left</small></button>
+          <button class="tool" data-tool="ramp"><b>╱</b><span>Ramp</span><small><em id="count-ramp">2</em> left</small></button>
+          <button class="tool" data-tool="spring"><b>≋</b><span>Spring</span><small><em id="count-spring">2</em> left</small></button>
+          <div class="edit-tools">
+            <button id="rotate" title="Rotate selected piece">↻ <span>Rotate</span></button>
+            <button id="delete" title="Remove selected piece">× <span>Remove</span></button>
+          </div>
+          <button id="launch" class="launch"><span>LAUNCH</span><small>send them on their way</small></button>
+          <button id="reset" class="reset">Reset this course</button>
+        </aside>
+      </div>
+
+      <footer class="game-footer">
+        <p><b>Build:</b> choose a piece and tap the meadow. Drag to move; select to rotate or remove.</p>
+        <div class="legend"><span>🥕 optional</span><span>🦔 golden challenge</span><span>Pieces tire after repeated hits</span></div>
+      </footer>
+    </section>
+  </main>
+  <script src="game.js"></script>
+</body>
+</html>
