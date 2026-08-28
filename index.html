@@ -22,6 +22,10 @@
     </header>
 
     <section class="game-card">
+      <nav class="level-strip" aria-label="Green Meadows levels">
+        <div class="world-label"><span id="world-name">Green Meadows</span><small id="world-subtitle">Choose a trail, then beat par to open the next level.</small></div>
+        <div id="level-list" class="level-list"></div>
+      </nav>
       <div class="mode-row" role="group" aria-label="Choose a challenge">
         <button class="mode active" data-mode="hare">
           <span>🐇</span><strong>The Hare</strong><small>Reach the goal quickly</small>
@@ -81,6 +85,7 @@
       <footer class="dialog-foot"><span>Stored in this browser</span><span id="layout-count">0 layouts</span></footer>
     </dialog>
   </main>
+  <script src="levels.js"></script>
   <script src="storage.js"></script>
   <script src="game.js"></script>
 </body>

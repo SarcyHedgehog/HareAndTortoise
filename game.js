@@ -14,9 +14,11 @@
   const saveLayoutForm = document.getElementById('save-layout-form');
   const saveStatusEl = document.getElementById('save-status');
   const layoutCountEl = document.getElementById('layout-count');
+  const levelListEl = document.getElementById('level-list');
   const storage = window.HareTortoiseStorage;
-  const limits = { platform: 4, ramp: 2, spring: 2 };
-  const LEVEL_ID = 'training-meadow';
+  const worlds = window.HareTortoiseWorlds;
+  const world = worlds[0];
+  const levels = world.levels;
   const PHYSICS_VERSION = 2;
 
   let mode = 'hare';
@@ -31,35 +33,41 @@
   let audio;
   let storageReady = false;
   let savedLayouts = [];
-  const saveTimers = { hare: null, tortoise: null };
+  const saveTimers = {};
   const FIXED_STEP = 1 / 120;
   let simulationAccumulator = 0;
 
-  const starter = [
-    { id: 1, type: 'platform', x: 405, y: 365, angle: 0, hits: 0 },
-    { id: 2, type: 'platform', x: 700, y: 525, angle: 0, hits: 0 },
-    { id: 3, type: 'ramp', x: 620, y: 510, angle: -0.25, hits: 0 },
-    { id: 4, type: 'spring', x: 945, y: 535, angle: 0, hits: 0 }
-  ];
-  const courses = { hare: clone(starter), tortoise: clone(starter) };
-  const best = {
-    hare: { overall: null, golden: null },
-    tortoise: { overall: null, golden: null }
-  };
-
   function clone(value) { return JSON.parse(JSON.stringify(value)); }
-  function pieces() { return courses[mode]; }
+  let currentLevelId = levels[0].id;
+  let limits = clone(levels[0].inventory);
+  const courses = Object.fromEntries(levels.map(entry => [entry.id, {
+    hare: freshPieces(entry.starter.hare),
+    tortoise: freshPieces(entry.starter.tortoise)
+  }]));
+  const progress = Object.fromEntries(levels.map(entry => [entry.id, {
+    hare: freshRecord(), tortoise: freshRecord()
+  }]));
+  const lastLevelByTrack = { hare: levels[0].id, tortoise: levels[0].id };
+
+  function freshRecord() { return { overall: null, golden: null, stars: 0, parBeaten: false }; }
+  function freshPieces(value) {
+    return clone(value || []).map((piece, index) => ({ ...piece, id: index + 1, hits: 0, tired: false }));
+  }
+  function level(id = currentLevelId) { return levels.find(entry => entry.id === id) || levels[0]; }
+  function pieces(track = mode, levelId = currentLevelId) { return courses[levelId][track]; }
+  function record(track = mode, levelId = currentLevelId) { return progress[levelId][track]; }
   function nextId() { return Math.max(0, ...pieces().map(p => p.id)) + 1; }
 
   function validTrack(value) { return value === 'tortoise' ? 'tortoise' : 'hare'; }
 
-  function sanitisePieces(value) {
+  function sanitisePieces(value, levelId = currentLevelId) {
     if (!Array.isArray(value)) return null;
-    const allowed = new Set(Object.keys(limits));
+    const inventory = level(levelId).inventory;
+    const allowed = new Set(Object.keys(inventory));
     const counts = { platform: 0, ramp: 0, spring: 0 };
     const result = [];
     for (const raw of value) {
-      if (!allowed.has(raw?.type) || counts[raw.type] >= limits[raw.type]) continue;
+      if (!allowed.has(raw?.type) || counts[raw.type] >= inventory[raw.type]) continue;
       const x = Number(raw.x), y = Number(raw.y), angle = Number(raw.angle);
       if (![x, y, angle].every(Number.isFinite)) continue;
       counts[raw.type]++;
@@ -76,25 +84,27 @@
     return result;
   }
 
-  function courseSnapshot(track = mode) {
+  function courseSnapshot(track = mode, levelId = currentLevelId) {
     return {
-      levelId: LEVEL_ID,
+      levelId,
+      levelRevision: level(levelId).revision,
       track,
       physicsVersion: PHYSICS_VERSION,
-      pieces: courses[track].map(({ type, x, y, angle }) => ({ type, x, y, angle }))
+      pieces: courses[levelId][track].map(({ type, x, y, angle }) => ({ type, x, y, angle }))
     };
   }
 
   function setSaveStatus(text) { saveStatusEl.textContent = text; }
 
-  function scheduleDraftSave(track = mode) {
+  function scheduleDraftSave(track = mode, levelId = currentLevelId) {
     if (!storageReady) return;
-    const snapshot = courseSnapshot(track);
-    clearTimeout(saveTimers[track]);
+    const snapshot = courseSnapshot(track, levelId);
+    const timerKey = `${levelId}:${track}`;
+    clearTimeout(saveTimers[timerKey]);
     setSaveStatus('Saving…');
-    saveTimers[track] = setTimeout(async () => {
+    saveTimers[timerKey] = setTimeout(async () => {
       try {
-        await storage.setState(`draft:${track}`, snapshot);
+        await storage.setState(`draft:${levelId}:${track}`, snapshot);
         setSaveStatus('Saved on this device');
       } catch (_) { setSaveStatus('Local save unavailable'); }
     }, 220);
@@ -103,18 +113,14 @@
   async function saveProgress() {
     if (!storageReady) return;
     try {
-      await storage.setState(`progress:${LEVEL_ID}`, clone(best));
+      await storage.setState('progress:v2', clone(progress));
       setSaveStatus('Scores saved locally');
     } catch (_) { setSaveStatus('Local save unavailable'); }
   }
 
   function resetCollectibles() {
-    carrots = [
-      { x: 405, y: 310, got: false },
-      { x: 635, y: 365, got: false },
-      { x: 820, y: 360, got: false }
-    ];
-    hedgehog = { x: 570, y: 225, got: false };
+    carrots = level().carrots.map(item => ({ ...item, got: false }));
+    hedgehog = level().goldenHedgehog ? { ...level().goldenHedgehog, got: false } : null;
   }
 
   function setMessage(title, body, hold = 2200) {
@@ -231,18 +237,62 @@
     selectedId = null; updateTools(); scheduleDraftSave();
   });
   document.getElementById('reset').addEventListener('click', () => {
-    courses[mode] = clone(starter); selectedId = null; running = false; ball = null;
+    courses[currentLevelId][mode] = freshPieces(level().starter[mode]); selectedId = null; running = false; ball = null;
     simulationAccumulator = 0;
     resetCollectibles(); updateTools(); launchButton.disabled = false; clockEl.textContent = '0.00s';
     scheduleDraftSave();
-    setMessage('Course restored', 'The training layout is ready again.');
+    setMessage('Course restored', `${level().name}'s starting layout is ready again.`);
   });
+
+  function isLevelUnlocked(levelId, track = mode) {
+    const index = levels.findIndex(entry => entry.id === levelId);
+    return index <= 0 || progress[levels[index - 1].id][track].parBeaten;
+  }
+
+  function highestUnlocked(track = mode) {
+    return [...levels].reverse().find(entry => isLevelUnlocked(entry.id, track))?.id || levels[0].id;
+  }
+
+  function renderLevelNav() {
+    levelListEl.replaceChildren();
+    levels.forEach((entry, index) => {
+      const unlocked = isLevelUnlocked(entry.id);
+      const result = progress[entry.id][mode];
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = `level-button${entry.id === currentLevelId ? ' active' : ''}`;
+      button.disabled = !unlocked;
+      button.dataset.level = entry.id;
+      const status = unlocked
+        ? (result.stars ? `${'★'.repeat(result.stars)}${'☆'.repeat(3 - result.stars)}` : `Par ${entry.scoring[mode].par}s`)
+        : `🔒 Beat level ${index}`;
+      button.innerHTML = `<span>${index + 1}</span><strong>${entry.name}</strong><small>${status}</small>`;
+      button.addEventListener('click', () => selectLevel(entry.id));
+      levelListEl.append(button);
+    });
+  }
+
+  function selectLevel(levelId, announce = true) {
+    if (!isLevelUnlocked(levelId)) return false;
+    currentLevelId = levelId;
+    lastLevelByTrack[mode] = levelId;
+    limits = clone(level().inventory);
+    running = false; ball = null; selectedId = null; activeTool = 'select';
+    simulationAccumulator = 0; launchButton.disabled = false; clockEl.textContent = '0.00s';
+    resetCollectibles(); updateTools(); updateBest(); renderLevelNav();
+    if (storageReady) storage.setState(`lastLevel:${mode}`, levelId).catch(() => {});
+    if (announce) setMessage(level().name, level().description || `Beat par to open the next ${mode} trail.`);
+    return true;
+  }
 
   function activateMode(track, announce = true) {
     mode = validTrack(track);
+    const preferred = lastLevelByTrack[mode];
+    currentLevelId = isLevelUnlocked(preferred, mode) ? preferred : highestUnlocked(mode);
+    limits = clone(level().inventory);
     document.querySelectorAll('.mode').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
     objectiveEl.textContent = mode === 'hare' ? 'FASTEST SUCCESSFUL RUN' : 'LONGEST VALID JOURNEY';
-    activeTool = 'select'; selectedId = null; resetCollectibles(); updateTools(); updateBest();
+    activeTool = 'select'; selectedId = null; resetCollectibles(); updateTools(); updateBest(); renderLevelNav();
     if (storageReady) storage.setState('lastTrack', mode).catch(() => {});
     if (announce) setMessage(mode === 'hare' ? 'The Hare' : 'The Tortoise', mode === 'hare' ? 'Build the quickest reliable course.' : 'Reach the goal, but take your time.');
   }
@@ -257,7 +307,8 @@
     resetCollectibles();
     pieces().forEach(p => { p.hits = 0; p.tired = false; });
     selectedId = null;
-    ball = { x: 92, y: 270, vx: 290, vy: -52, radius: 18, trail: [], age: 0 };
+    const launcher = level().launcher;
+    ball = { x: launcher.x, y: launcher.y, vx: launcher.vx, vy: launcher.vy, radius: 18, trail: [], age: 0, scoreAge: 0, clockEffectRemaining: 0 };
     running = true; simulationAccumulator = 0; launchButton.disabled = true;
     messageEl.classList.add('hidden'); sound('launch');
   });
@@ -307,19 +358,119 @@
     }
   }
 
+  function collideStaticSegment(ax, ay, bx, by, thickness = 7) {
+    const vx = bx - ax, vy = by - ay;
+    const len2 = vx * vx + vy * vy;
+    const t = Math.max(0, Math.min(1, ((ball.x - ax) * vx + (ball.y - ay) * vy) / len2));
+    const px = ax + t * vx, py = ay + t * vy;
+    const dx = ball.x - px, dy = ball.y - py;
+    const distance = Math.hypot(dx, dy);
+    if (distance > ball.radius + thickness) return;
+    let nx = distance > .001 ? dx / distance : -vy / Math.sqrt(len2);
+    let ny = distance > .001 ? dy / distance : vx / Math.sqrt(len2);
+    if (ball.vx * nx + ball.vy * ny > 0) { nx *= -1; ny *= -1; }
+    const approach = ball.vx * nx + ball.vy * ny;
+    ball.x += nx * (ball.radius + thickness - distance);
+    ball.y += ny * (ball.radius + thickness - distance);
+    if (approach < 0) {
+      ball.vx = (ball.vx - 2 * approach * nx) * .86;
+      ball.vy = (ball.vy - 2 * approach * ny) * .86;
+    }
+  }
+
+  function tubeWalls(tube) {
+    const half = tube.width / 2;
+    const points = tube.points.map(([x, y]) => ({ x, y }));
+    const segments = points.slice(0, -1).map((point, index) => {
+      const next = points[index + 1];
+      const length = Math.hypot(next.x - point.x, next.y - point.y) || 1;
+      const dx = (next.x - point.x) / length, dy = (next.y - point.y) / length;
+      return { dx, dy, nx: -dy, ny: dx };
+    });
+    return [-1, 1].map(sign => {
+      const wall = [{ x: points[0].x + segments[0].nx * half * sign, y: points[0].y + segments[0].ny * half * sign }];
+      for (let index = 1; index < points.length - 1; index++) {
+        const before = segments[index - 1], after = segments[index];
+        const a = { x: points[index].x + before.nx * half * sign, y: points[index].y + before.ny * half * sign };
+        const b = { x: points[index].x + after.nx * half * sign, y: points[index].y + after.ny * half * sign };
+        const cross = before.dx * after.dy - before.dy * after.dx;
+        const t = Math.abs(cross) < .0001 ? 0 : ((b.x - a.x) * after.dy - (b.y - a.y) * after.dx) / cross;
+        wall.push({ x: a.x + before.dx * t, y: a.y + before.dy * t });
+      }
+      const last = points.length - 1, segment = segments[segments.length - 1];
+      wall.push({ x: points[last].x + segment.nx * half * sign, y: points[last].y + segment.ny * half * sign });
+      return wall;
+    });
+  }
+
+  function collideBlock(block) {
+    const left = block.x - block.width / 2, right = block.x + block.width / 2;
+    const top = block.y - block.height / 2, bottom = block.y + block.height / 2;
+    const px = Math.max(left, Math.min(right, ball.x));
+    const py = Math.max(top, Math.min(bottom, ball.y));
+    let dx = ball.x - px, dy = ball.y - py, distance = Math.hypot(dx, dy);
+    let nx, ny, penetration;
+    if (distance > .001) {
+      if (distance >= ball.radius) return;
+      nx = dx / distance; ny = dy / distance; penetration = ball.radius - distance;
+    } else {
+      const edges = [
+        { d: ball.x - left, nx: -1, ny: 0 }, { d: right - ball.x, nx: 1, ny: 0 },
+        { d: ball.y - top, nx: 0, ny: -1 }, { d: bottom - ball.y, nx: 0, ny: 1 }
+      ].sort((a, b) => a.d - b.d);
+      ({ nx, ny } = edges[0]); penetration = ball.radius + edges[0].d;
+    }
+    ball.x += nx * penetration; ball.y += ny * penetration;
+    const approach = ball.vx * nx + ball.vy * ny;
+    if (approach < 0) {
+      ball.vx = (ball.vx - 2 * approach * nx) * .84;
+      ball.vy = (ball.vy - 2 * approach * ny) * .84;
+    }
+  }
+
+  function collideFixedObjects() {
+    for (const object of level().fixedObjects || []) {
+      if (object.type === 'block') collideBlock(object);
+      if (object.type === 'tube') {
+        for (const wall of tubeWalls(object)) {
+          for (let index = 1; index < wall.length; index++) {
+            collideStaticSegment(wall[index - 1].x, wall[index - 1].y, wall[index].x, wall[index].y);
+          }
+        }
+      }
+    }
+  }
+
+  function starsFor(time, track = mode) {
+    const stars = level().scoring[track].stars;
+    if (track === 'hare') return time <= stars.three ? 3 : time <= stars.two ? 2 : time <= stars.one ? 1 : 0;
+    return time >= stars.three ? 3 : time >= stars.two ? 2 : time >= stars.one ? 1 : 0;
+  }
+
+  function beatsPar(time, track = mode) {
+    const par = level().scoring[track].par;
+    return track === 'hare' ? time <= par : time >= par;
+  }
+
   function finish(success, failureReason = 'meadow') {
     if (!running) return;
     running = false; launchButton.disabled = false;
-    const time = ball.age;
+    const time = ball.scoreAge;
     if (success) {
       const collected = carrots.filter(c => c.got).length;
       const scoreTime = time;
-      const record = best[mode];
+      const result = record();
       const betterThan = value => value == null || (mode === 'hare' ? scoreTime < value : scoreTime > value);
-      if (betterThan(record.overall)) record.overall = scoreTime;
-      if (hedgehog.got && betterThan(record.golden)) record.golden = scoreTime;
-      const stars = mode === 'hare' ? (time < 5 ? 3 : time < 8 ? 2 : 1) : (time > 12 ? 3 : time > 8 ? 2 : 1);
-      setMessage(`${'★'.repeat(stars)}${'☆'.repeat(3-stars)} Goal reached in ${time.toFixed(2)}s`, `${collected}/3 carrots${hedgehog.got ? ' · Golden Hedgehog found!' : ''}`, 4200);
+      if (betterThan(result.overall)) result.overall = scoreTime;
+      if (hedgehog?.got && betterThan(result.golden)) result.golden = scoreTime;
+      const stars = starsFor(time);
+      result.stars = Math.max(result.stars, stars);
+      const newlyBeatPar = beatsPar(time) && !result.parBeaten;
+      if (beatsPar(time)) result.parBeaten = true;
+      const levelIndex = levels.findIndex(entry => entry.id === currentLevelId);
+      const next = levels[levelIndex + 1];
+      const unlockText = newlyBeatPar && next ? ` · ${next.name} unlocked!` : '';
+      setMessage(`${'★'.repeat(stars)}${'☆'.repeat(3-stars)} Goal reached in ${time.toFixed(2)}s`, `${collected}/${carrots.length} carrots${hedgehog?.got ? ' · Golden Hedgehog found!' : ''}${unlockText}`, 4600);
       celebration = Array.from({ length: 50 }, (_, index) => {
         const spread = ((index * 37) % 101) / 100 - .5;
         const lift = ((index * 53) % 97) / 96;
@@ -332,7 +483,7 @@
           color: index % 2 ? '#f3ca52' : mode === 'hare' ? '#ec8c3c' : '#8eb44a'
         };
       });
-      sound('win'); updateBest(); saveProgress();
+      sound('win'); updateBest(); renderLevelNav(); saveProgress();
     } else {
       const failureMessages = {
         timeout: 'The Hare ran out of time. Build a quicker route.',
@@ -345,18 +496,23 @@
   }
 
   function updateBest() {
-    const record = best[mode];
-    if (record.overall == null) {
-      bestEl.textContent = 'Best —';
+    const result = record();
+    const par = level().scoring[mode].par;
+    if (result.overall == null) {
+      bestEl.textContent = `Best — · Par ${par}s`;
       return;
     }
-    bestEl.textContent = `Best ${record.overall.toFixed(2)}s${record.golden == null ? '' : ` · 🦔 ${record.golden.toFixed(2)}s`}`;
+    bestEl.textContent = `Best ${result.overall.toFixed(2)}s · Par ${par}s${result.golden == null ? '' : ` · 🦔 ${result.golden.toFixed(2)}s`}`;
   }
 
   function update(dt) {
     if (running && ball) {
       ball.age += dt;
-      clockEl.textContent = `${ball.age.toFixed(2)}s`;
+      if (ball.clockEffectRemaining > 0) {
+        ball.scoreAge += mode === 'hare' ? 0 : dt * 2;
+        ball.clockEffectRemaining = Math.max(0, ball.clockEffectRemaining - dt);
+      } else ball.scoreAge += dt;
+      clockEl.textContent = `${ball.scoreAge.toFixed(2)}s`;
       const steps = 3;
       for (let i = 0; i < steps; i++) {
         const step = dt / steps;
@@ -364,6 +520,7 @@
         ball.vx *= Math.pow(.998, step * 60);
         ball.x += ball.vx * step; ball.y += ball.vy * step;
         for (const piece of [...pieces()]) collidePiece(piece);
+        collideFixedObjects();
         if (ball.x < ball.radius) { ball.x = ball.radius; ball.vx = Math.abs(ball.vx) * .82; }
         if (ball.x > canvas.width - ball.radius) { ball.x = canvas.width - ball.radius; ball.vx = -Math.abs(ball.vx) * .82; }
         const roof = 24;
@@ -376,12 +533,16 @@
       ball.trail.push({ x: ball.x, y: ball.y, life: 1 });
       if (ball.trail.length > 45) ball.trail.shift();
       ball.trail.forEach(p => p.life -= dt * 1.7);
-      for (const carrot of carrots) if (!carrot.got && Math.hypot(ball.x-carrot.x, ball.y-carrot.y) < 34) { carrot.got = true; sound('collect'); }
-      if (!hedgehog.got && Math.hypot(ball.x-hedgehog.x, ball.y-hedgehog.y) < 34) { hedgehog.got = true; sound('collect'); }
-      if (Math.hypot(ball.x - 1023, ball.y - 494) < 46) finish(true);
+      for (const carrot of carrots) if (!carrot.got && Math.hypot(ball.x-carrot.x, ball.y-carrot.y) < 34) {
+        carrot.got = true;
+        ball.clockEffectRemaining += level().scoring.carrotClockEffectSeconds;
+        sound('collect');
+      }
+      if (hedgehog && !hedgehog.got && Math.hypot(ball.x-hedgehog.x, ball.y-hedgehog.y) < 34) { hedgehog.got = true; sound('collect'); }
+      const goal = level().goal;
+      if (Math.hypot(ball.x - goal.x, ball.y - goal.y) < 46) finish(true);
       else if (ball.y > 590) finish(false, 'meadow');
-      else if (mode === 'hare' && ball.age >= 25) finish(false, 'timeout');
-      else if (Math.hypot(ball.vx, ball.vy) < 8 && ball.age > 2) finish(false, 'stopped');
+      else if (mode === 'hare' && ball.scoreAge >= 25) finish(false, 'timeout');
     }
     celebration.forEach(p => { p.x += p.vx*dt; p.y += p.vy*dt; p.vy += 240*dt; p.life -= dt; });
     celebration = celebration.filter(p => p.life > 0);
@@ -426,18 +587,49 @@
   }
 
   function drawLauncher() {
-    ctx.save(); ctx.translate(76,303);
+    const launcher = level().launcher;
+    ctx.save(); ctx.translate(launcher.x - 16, launcher.y + 33);
     ctx.fillStyle = '#713e27'; roundedRect(-28,-18,55,72,12);
     ctx.fillStyle = '#f3ca52'; roundedRect(-18,-8,35,50,8);
     ctx.strokeStyle = '#513121'; ctx.lineWidth = 11; ctx.beginPath(); ctx.moveTo(0,-4); ctx.lineTo(18,-50); ctx.stroke();
     ctx.restore();
-    ctx.fillStyle = '#173b3a'; ctx.font = '700 12px system-ui'; ctx.fillText('DROP-OFF', 43, 382);
+    ctx.fillStyle = '#173b3a'; ctx.font = '700 12px system-ui'; ctx.fillText('DROP-OFF', launcher.x - 49, launcher.y + 112);
   }
 
   function drawGoal() {
-    ctx.strokeStyle = '#173b3a'; ctx.lineWidth = 8; ctx.beginPath(); ctx.arc(1023,494,34,0,Math.PI*2); ctx.stroke();
-    ctx.fillStyle = '#f4e6c1'; ctx.beginPath(); ctx.arc(1023,494,25,0,Math.PI*2); ctx.fill();
-    ctx.fillStyle = '#173b3a'; ctx.font = '800 11px system-ui'; ctx.textAlign = 'center'; ctx.fillText('GOAL',1023,498); ctx.textAlign='left';
+    const goal = level().goal;
+    ctx.strokeStyle = '#173b3a'; ctx.lineWidth = 8; ctx.beginPath(); ctx.arc(goal.x,goal.y,34,0,Math.PI*2); ctx.stroke();
+    ctx.fillStyle = '#f4e6c1'; ctx.beginPath(); ctx.arc(goal.x,goal.y,25,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#173b3a'; ctx.font = '800 11px system-ui'; ctx.textAlign = 'center'; ctx.fillText('GOAL',goal.x,goal.y+4); ctx.textAlign='left';
+  }
+
+  function drawFixedObject(object) {
+    if (object.type === 'block') {
+      const left = object.x - object.width / 2, top = object.y - object.height / 2;
+      ctx.save();
+      ctx.fillStyle = object.color || '#4f8f45';
+      ctx.strokeStyle = '#255c39'; ctx.lineWidth = 8;
+      ctx.beginPath(); ctx.roundRect(left, top, object.width, object.height, 10); ctx.fill(); ctx.stroke();
+      ctx.strokeStyle = 'rgba(222,245,190,.38)'; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(left + 16, top + 20); ctx.lineTo(left + object.width - 16, top + 20); ctx.stroke();
+      ctx.fillStyle = 'rgba(20,73,42,.24)';
+      for (let y = top + 42; y < top + object.height - 10; y += 28) {
+        for (let x = left + 24; x < left + object.width - 10; x += 34) {
+          ctx.beginPath(); ctx.arc(x, y, 4, 0, Math.PI * 2); ctx.fill();
+        }
+      }
+      ctx.restore();
+    }
+    if (object.type === 'tube') {
+      ctx.save(); ctx.lineJoin = 'round'; ctx.lineCap = 'butt';
+      ctx.beginPath();
+      object.points.forEach(([x, y], index) => index ? ctx.lineTo(x, y) : ctx.moveTo(x, y));
+      ctx.strokeStyle = '#1f693a'; ctx.lineWidth = object.width + 18; ctx.stroke();
+      ctx.strokeStyle = object.color || '#39a852'; ctx.lineWidth = object.width + 8; ctx.stroke();
+      ctx.strokeStyle = '#d6eee0'; ctx.lineWidth = object.width - 18; ctx.stroke();
+      ctx.strokeStyle = 'rgba(255,255,255,.42)'; ctx.lineWidth = 5; ctx.stroke();
+      ctx.restore();
+    }
   }
 
   function drawPiece(piece) {
@@ -468,7 +660,7 @@
   function drawCollectibles() {
     ctx.font = '27px serif'; ctx.textAlign = 'center';
     for (const item of carrots) if (!item.got) ctx.fillText('🥕', item.x, item.y);
-    if (!hedgehog.got) { ctx.font='29px serif'; ctx.fillText('🦔', hedgehog.x, hedgehog.y); ctx.strokeStyle='rgba(243,202,82,.55)'; ctx.beginPath(); ctx.arc(hedgehog.x,hedgehog.y-9,24,0,Math.PI*2); ctx.stroke(); }
+    if (hedgehog && !hedgehog.got) { ctx.font='29px serif'; ctx.fillText('🦔', hedgehog.x, hedgehog.y); ctx.strokeStyle='rgba(243,202,82,.55)'; ctx.beginPath(); ctx.arc(hedgehog.x,hedgehog.y-9,24,0,Math.PI*2); ctx.stroke(); }
     ctx.textAlign='left';
   }
 
@@ -482,7 +674,7 @@
   }
 
   function draw() {
-    drawBackground(); drawLauncher(); drawGoal(); drawCollectibles(); pieces().forEach(drawPiece); drawBall();
+    drawBackground(); drawLauncher(); drawGoal(); (level().fixedObjects || []).forEach(drawFixedObject); drawCollectibles(); pieces().forEach(drawPiece); drawBall();
     for (const p of celebration) { ctx.globalAlpha=Math.max(0,p.life/1.5); ctx.fillStyle=p.color; ctx.fillRect(p.x,p.y,7,7); } ctx.globalAlpha=1;
   }
 
@@ -497,6 +689,7 @@
       id,
       name,
       levelId: snapshot.levelId,
+      levelRevision: snapshot.levelRevision,
       track: snapshot.track,
       physicsVersion: snapshot.physicsVersion,
       pieces: snapshot.pieces,
@@ -539,7 +732,8 @@
       title.textContent = layout.name;
       const date = document.createElement('small');
       const parsedDate = new Date(layout.updatedAt);
-      date.textContent = Number.isNaN(parsedDate.getTime()) ? 'Saved locally' : `Updated ${parsedDate.toLocaleDateString()}`;
+      const savedLevel = level(layout.levelId === 'training-meadow' ? 'green-1' : layout.levelId);
+      date.textContent = `${savedLevel.name} · ${Number.isNaN(parsedDate.getTime()) ? 'Saved locally' : `Updated ${parsedDate.toLocaleDateString()}`}`;
       details.append(badge, title, date);
       const actions = document.createElement('div');
       actions.className = 'layout-actions';
@@ -556,13 +750,17 @@
 
   function loadLayout(layout) {
     const track = validTrack(layout.track);
-    const cleanPieces = sanitisePieces(layout.pieces);
+    const levelId = layout.levelId === 'training-meadow' ? 'green-1' : layout.levelId;
+    if (!levels.some(entry => entry.id === levelId)) throw new Error('This layout belongs to an unknown level.');
+    const cleanPieces = sanitisePieces(layout.pieces, levelId);
     if (!cleanPieces) throw new Error('This layout is not valid.');
     running = false; ball = null; simulationAccumulator = 0;
     launchButton.disabled = false; clockEl.textContent = '0.00s';
-    courses[track] = cleanPieces;
+    courses[levelId][track] = cleanPieces;
+    lastLevelByTrack[track] = levelId;
     activateMode(track, false);
-    scheduleDraftSave(track);
+    if (!selectLevel(levelId, false)) throw new Error('Beat par on the previous level before loading this layout.');
+    scheduleDraftSave(track, levelId);
     layoutDialog.close();
     setMessage('Layout loaded', `${layout.name} is ready on the ${track === 'hare' ? 'Hare' : 'Tortoise'} trail.`);
   }
@@ -622,23 +820,50 @@
     }
     try {
       await storage.ready();
-      const [hareDraft, tortoiseDraft, progress, lastTrack] = await Promise.all([
+      const draftRequests = levels.flatMap(entry => ['hare', 'tortoise'].map(track => storage.getState(`draft:${entry.id}:${track}`)));
+      const [oldHareDraft, oldTortoiseDraft, savedProgress, oldProgress, lastTrack, lastHareLevel, lastTortoiseLevel, ...drafts] = await Promise.all([
         storage.getState('draft:hare'),
         storage.getState('draft:tortoise'),
-        storage.getState(`progress:${LEVEL_ID}`),
-        storage.getState('lastTrack')
+        storage.getState('progress:v2'),
+        storage.getState('progress:training-meadow'),
+        storage.getState('lastTrack'),
+        storage.getState('lastLevel:hare'),
+        storage.getState('lastLevel:tortoise'),
+        ...draftRequests
       ]);
-      for (const [track, draft] of [['hare', hareDraft], ['tortoise', tortoiseDraft]]) {
-        if (draft?.levelId !== LEVEL_ID) continue;
-        const cleanPieces = sanitisePieces(draft.pieces);
-        if (cleanPieces) courses[track] = cleanPieces;
-      }
-      for (const track of ['hare', 'tortoise']) {
-        for (const category of ['overall', 'golden']) {
-          const value = progress?.[track]?.[category];
-          if (typeof value === 'number' && Number.isFinite(value) && value >= 0) best[track][category] = value;
+      let draftIndex = 0;
+      for (const entry of levels) {
+        for (const track of ['hare', 'tortoise']) {
+          const draft = drafts[draftIndex++];
+          const cleanPieces = draft?.levelId === entry.id ? sanitisePieces(draft.pieces, entry.id) : null;
+          if (cleanPieces) courses[entry.id][track] = cleanPieces;
         }
       }
+      for (const [track, oldDraft] of [['hare', oldHareDraft], ['tortoise', oldTortoiseDraft]]) {
+        const cleanPieces = sanitisePieces(oldDraft?.pieces, 'green-1');
+        if (cleanPieces && !drafts[['hare', 'tortoise'].indexOf(track)]) courses['green-1'][track] = cleanPieces;
+      }
+      for (const entry of levels) {
+        for (const track of ['hare', 'tortoise']) {
+          const saved = savedProgress?.[entry.id]?.[track];
+          const target = progress[entry.id][track];
+          for (const category of ['overall', 'golden']) {
+            const value = saved?.[category];
+            if (typeof value === 'number' && Number.isFinite(value) && value >= 0) target[category] = value;
+          }
+          target.stars = Math.max(0, Math.min(3, Number(saved?.stars) || 0));
+          target.parBeaten = Boolean(saved?.parBeaten);
+        }
+      }
+      for (const track of ['hare', 'tortoise']) {
+        const target = progress['green-1'][track];
+        for (const category of ['overall', 'golden']) {
+          const value = oldProgress?.[track]?.[category];
+          if (target[category] == null && typeof value === 'number' && Number.isFinite(value) && value >= 0) target[category] = value;
+        }
+      }
+      if (levels.some(entry => entry.id === lastHareLevel)) lastLevelByTrack.hare = lastHareLevel;
+      if (levels.some(entry => entry.id === lastTortoiseLevel)) lastLevelByTrack.tortoise = lastTortoiseLevel;
       storageReady = true;
       activateMode(lastTrack, false);
       setSaveStatus('Saved on this device');
@@ -660,5 +885,7 @@
     requestAnimationFrame(frame);
   }
 
-  resetCollectibles(); updateTools(); updateBest(); restoreLocalData(); requestAnimationFrame(frame);
+  document.getElementById('world-name').textContent = world.name;
+  document.getElementById('world-subtitle').textContent = world.subtitle;
+  resetCollectibles(); updateTools(); updateBest(); renderLevelNav(); restoreLocalData(); requestAnimationFrame(frame);
 })();
