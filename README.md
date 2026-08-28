@@ -24,6 +24,7 @@ Open `index.html` directly, or use VS Code Live Server. No build step, account, 
 - Named layouts with load, rename, duplicate and delete controls
 - Separate personal bests for each trail, including Golden Hedgehog runs
 - Star ratings, synthesized sound and responsive touch controls
+- Landscape-first tablet and phone presentation with a full-size playfield, compact touch shed and portrait rotation prompt
 
 This is deliberately a vertical slice rather than a complete game. More worlds, a proper level editor and asynchronous challenges belong in later passes.
 
