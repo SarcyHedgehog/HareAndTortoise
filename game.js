@@ -8,7 +8,16 @@
   const objectiveEl = document.getElementById('objective');
   const messageEl = document.getElementById('message');
   const launchButton = document.getElementById('launch');
+  const layoutDialog = document.getElementById('layout-dialog');
+  const layoutList = document.getElementById('layout-list');
+  const layoutNameInput = document.getElementById('layout-name');
+  const saveLayoutForm = document.getElementById('save-layout-form');
+  const saveStatusEl = document.getElementById('save-status');
+  const layoutCountEl = document.getElementById('layout-count');
+  const storage = window.HareTortoiseStorage;
   const limits = { platform: 4, ramp: 2, spring: 2 };
+  const LEVEL_ID = 'training-meadow';
+  const PHYSICS_VERSION = 2;
 
   let mode = 'hare';
   let activeTool = 'select';
@@ -20,6 +29,9 @@
   let hedgehog = null;
   let celebration = [];
   let audio;
+  let storageReady = false;
+  let savedLayouts = [];
+  const saveTimers = { hare: null, tortoise: null };
   const FIXED_STEP = 1 / 120;
   let simulationAccumulator = 0;
 
@@ -30,11 +42,71 @@
     { id: 4, type: 'spring', x: 945, y: 535, angle: 0, hits: 0 }
   ];
   const courses = { hare: clone(starter), tortoise: clone(starter) };
-  const best = { hare: null, tortoise: null };
+  const best = {
+    hare: { overall: null, golden: null },
+    tortoise: { overall: null, golden: null }
+  };
 
   function clone(value) { return JSON.parse(JSON.stringify(value)); }
   function pieces() { return courses[mode]; }
   function nextId() { return Math.max(0, ...pieces().map(p => p.id)) + 1; }
+
+  function validTrack(value) { return value === 'tortoise' ? 'tortoise' : 'hare'; }
+
+  function sanitisePieces(value) {
+    if (!Array.isArray(value)) return null;
+    const allowed = new Set(Object.keys(limits));
+    const counts = { platform: 0, ramp: 0, spring: 0 };
+    const result = [];
+    for (const raw of value) {
+      if (!allowed.has(raw?.type) || counts[raw.type] >= limits[raw.type]) continue;
+      const x = Number(raw.x), y = Number(raw.y), angle = Number(raw.angle);
+      if (![x, y, angle].every(Number.isFinite)) continue;
+      counts[raw.type]++;
+      result.push({
+        id: result.length + 1,
+        type: raw.type,
+        x: Math.max(125, Math.min(985, x)),
+        y: Math.max(110, Math.min(535, y)),
+        angle,
+        hits: 0,
+        tired: false
+      });
+    }
+    return result;
+  }
+
+  function courseSnapshot(track = mode) {
+    return {
+      levelId: LEVEL_ID,
+      track,
+      physicsVersion: PHYSICS_VERSION,
+      pieces: courses[track].map(({ type, x, y, angle }) => ({ type, x, y, angle }))
+    };
+  }
+
+  function setSaveStatus(text) { saveStatusEl.textContent = text; }
+
+  function scheduleDraftSave(track = mode) {
+    if (!storageReady) return;
+    const snapshot = courseSnapshot(track);
+    clearTimeout(saveTimers[track]);
+    setSaveStatus('Saving…');
+    saveTimers[track] = setTimeout(async () => {
+      try {
+        await storage.setState(`draft:${track}`, snapshot);
+        setSaveStatus('Saved on this device');
+      } catch (_) { setSaveStatus('Local save unavailable'); }
+    }, 220);
+  }
+
+  async function saveProgress() {
+    if (!storageReady) return;
+    try {
+      await storage.setState(`progress:${LEVEL_ID}`, clone(best));
+      setSaveStatus('Scores saved locally');
+    } catch (_) { setSaveStatus('Local save unavailable'); }
+  }
 
   function resetCollectibles() {
     carrots = [
@@ -137,7 +209,10 @@
     piece.x = Math.max(125, Math.min(985, point.x));
     piece.y = Math.max(110, Math.min(535, point.y));
   });
-  canvas.addEventListener('pointerup', () => { dragging = false; });
+  canvas.addEventListener('pointerup', () => {
+    if (dragging) scheduleDraftSave();
+    dragging = false;
+  });
 
   document.querySelectorAll('.tool').forEach(button => button.addEventListener('click', () => {
     activeTool = button.dataset.tool;
@@ -147,28 +222,34 @@
   document.getElementById('rotate').addEventListener('click', () => {
     if (running) return;
     const piece = pieces().find(p => p.id === selectedId);
-    if (piece) { piece.angle += Math.PI / 4; sound('bounce'); }
+    if (piece) { piece.angle += Math.PI / 4; sound('bounce'); scheduleDraftSave(); }
   });
   document.getElementById('delete').addEventListener('click', () => {
     if (running || selectedId == null) return;
     const index = pieces().findIndex(p => p.id === selectedId);
     if (index >= 0) pieces().splice(index, 1);
-    selectedId = null; updateTools();
+    selectedId = null; updateTools(); scheduleDraftSave();
   });
   document.getElementById('reset').addEventListener('click', () => {
     courses[mode] = clone(starter); selectedId = null; running = false; ball = null;
     simulationAccumulator = 0;
     resetCollectibles(); updateTools(); launchButton.disabled = false; clockEl.textContent = '0.00s';
+    scheduleDraftSave();
     setMessage('Course restored', 'The training layout is ready again.');
   });
 
-  document.querySelectorAll('.mode').forEach(button => button.addEventListener('click', () => {
-    if (running) return;
-    mode = button.dataset.mode;
-    document.querySelectorAll('.mode').forEach(b => b.classList.toggle('active', b === button));
+  function activateMode(track, announce = true) {
+    mode = validTrack(track);
+    document.querySelectorAll('.mode').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
     objectiveEl.textContent = mode === 'hare' ? 'FASTEST SUCCESSFUL RUN' : 'LONGEST VALID JOURNEY';
     activeTool = 'select'; selectedId = null; resetCollectibles(); updateTools(); updateBest();
-    setMessage(mode === 'hare' ? 'The Hare' : 'The Tortoise', mode === 'hare' ? 'Build the quickest reliable course.' : 'Reach the goal, but take your time.');
+    if (storageReady) storage.setState('lastTrack', mode).catch(() => {});
+    if (announce) setMessage(mode === 'hare' ? 'The Hare' : 'The Tortoise', mode === 'hare' ? 'Build the quickest reliable course.' : 'Reach the goal, but take your time.');
+  }
+
+  document.querySelectorAll('.mode').forEach(button => button.addEventListener('click', () => {
+    if (running) return;
+    activateMode(button.dataset.mode);
   }));
 
   launchButton.addEventListener('click', () => {
@@ -233,8 +314,10 @@
     if (success) {
       const collected = carrots.filter(c => c.got).length;
       const scoreTime = time;
-      const isBest = best[mode] == null || (mode === 'hare' ? scoreTime < best[mode] : scoreTime > best[mode]);
-      if (isBest) best[mode] = scoreTime;
+      const record = best[mode];
+      const betterThan = value => value == null || (mode === 'hare' ? scoreTime < value : scoreTime > value);
+      if (betterThan(record.overall)) record.overall = scoreTime;
+      if (hedgehog.got && betterThan(record.golden)) record.golden = scoreTime;
       const stars = mode === 'hare' ? (time < 5 ? 3 : time < 8 ? 2 : 1) : (time > 12 ? 3 : time > 8 ? 2 : 1);
       setMessage(`${'★'.repeat(stars)}${'☆'.repeat(3-stars)} Goal reached in ${time.toFixed(2)}s`, `${collected}/3 carrots${hedgehog.got ? ' · Golden Hedgehog found!' : ''}`, 4200);
       celebration = Array.from({ length: 50 }, (_, index) => {
@@ -249,7 +332,7 @@
           color: index % 2 ? '#f3ca52' : mode === 'hare' ? '#ec8c3c' : '#8eb44a'
         };
       });
-      sound('win'); updateBest();
+      sound('win'); updateBest(); saveProgress();
     } else {
       const failureMessages = {
         timeout: 'The Hare ran out of time. Build a quicker route.',
@@ -261,7 +344,14 @@
     }
   }
 
-  function updateBest() { bestEl.textContent = best[mode] == null ? 'Best —' : `Best ${best[mode].toFixed(2)}s`; }
+  function updateBest() {
+    const record = best[mode];
+    if (record.overall == null) {
+      bestEl.textContent = 'Best —';
+      return;
+    }
+    bestEl.textContent = `Best ${record.overall.toFixed(2)}s${record.golden == null ? '' : ` · 🦔 ${record.golden.toFixed(2)}s`}`;
+  }
 
   function update(dt) {
     if (running && ball) {
@@ -396,6 +486,168 @@
     for (const p of celebration) { ctx.globalAlpha=Math.max(0,p.life/1.5); ctx.fillStyle=p.color; ctx.fillRect(p.x,p.y,7,7); } ctx.globalAlpha=1;
   }
 
+  function newLayoutId() {
+    return crypto.randomUUID?.() || `layout-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  }
+
+  function makeLayout(name, id = newLayoutId()) {
+    const now = new Date().toISOString();
+    const snapshot = courseSnapshot();
+    return {
+      id,
+      name,
+      levelId: snapshot.levelId,
+      track: snapshot.track,
+      physicsVersion: snapshot.physicsVersion,
+      pieces: snapshot.pieces,
+      createdAt: now,
+      updatedAt: now
+    };
+  }
+
+  function layoutButton(label, action, id, className = '') {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.textContent = label;
+    button.dataset.action = action;
+    button.dataset.id = id;
+    if (className) button.className = className;
+    return button;
+  }
+
+  async function renderLayouts() {
+    if (!storageReady) return;
+    savedLayouts = await storage.listLayouts();
+    layoutCountEl.textContent = `${savedLayouts.length} layout${savedLayouts.length === 1 ? '' : 's'}`;
+    layoutList.replaceChildren();
+    if (!savedLayouts.length) {
+      const empty = document.createElement('p');
+      empty.className = 'layout-empty';
+      empty.textContent = 'No named layouts yet. Your current course is still recovered automatically.';
+      layoutList.append(empty);
+      return;
+    }
+    for (const layout of savedLayouts) {
+      const row = document.createElement('article');
+      row.className = 'layout-row';
+      const details = document.createElement('div');
+      details.className = 'layout-meta';
+      const badge = document.createElement('span');
+      badge.className = 'track-badge';
+      badge.textContent = validTrack(layout.track) === 'hare' ? 'Hare' : 'Tortoise';
+      const title = document.createElement('strong');
+      title.textContent = layout.name;
+      const date = document.createElement('small');
+      const parsedDate = new Date(layout.updatedAt);
+      date.textContent = Number.isNaN(parsedDate.getTime()) ? 'Saved locally' : `Updated ${parsedDate.toLocaleDateString()}`;
+      details.append(badge, title, date);
+      const actions = document.createElement('div');
+      actions.className = 'layout-actions';
+      actions.append(
+        layoutButton('Load', 'load', layout.id, 'load-layout'),
+        layoutButton('Rename', 'rename', layout.id),
+        layoutButton('Duplicate', 'duplicate', layout.id),
+        layoutButton('Delete', 'delete', layout.id, 'delete-layout')
+      );
+      row.append(details, actions);
+      layoutList.append(row);
+    }
+  }
+
+  function loadLayout(layout) {
+    const track = validTrack(layout.track);
+    const cleanPieces = sanitisePieces(layout.pieces);
+    if (!cleanPieces) throw new Error('This layout is not valid.');
+    running = false; ball = null; simulationAccumulator = 0;
+    launchButton.disabled = false; clockEl.textContent = '0.00s';
+    courses[track] = cleanPieces;
+    activateMode(track, false);
+    scheduleDraftSave(track);
+    layoutDialog.close();
+    setMessage('Layout loaded', `${layout.name} is ready on the ${track === 'hare' ? 'Hare' : 'Tortoise'} trail.`);
+  }
+
+  document.getElementById('layouts').addEventListener('click', async () => {
+    if (!storageReady) {
+      setMessage('Local saves unavailable', 'This browser could not open its save database.');
+      return;
+    }
+    await storage.requestPersistence().catch(() => false);
+    await renderLayouts();
+    layoutDialog.showModal();
+    layoutNameInput.focus();
+  });
+  document.getElementById('close-layouts').addEventListener('click', () => layoutDialog.close());
+  layoutDialog.addEventListener('click', event => {
+    if (event.target === layoutDialog) layoutDialog.close();
+  });
+
+  saveLayoutForm.addEventListener('submit', async event => {
+    event.preventDefault();
+    const name = layoutNameInput.value.trim();
+    if (!name || !storageReady) return;
+    await storage.putLayout(makeLayout(name));
+    layoutNameInput.value = '';
+    setSaveStatus('Named layout saved');
+    await renderLayouts();
+  });
+
+  layoutList.addEventListener('click', async event => {
+    const button = event.target.closest('button[data-action]');
+    if (!button || !storageReady) return;
+    const layout = savedLayouts.find(item => item.id === button.dataset.id);
+    if (!layout) return;
+    if (button.dataset.action === 'load') {
+      loadLayout(layout);
+      return;
+    }
+    if (button.dataset.action === 'rename') {
+      const name = prompt('Rename this layout', layout.name)?.trim();
+      if (!name) return;
+      await storage.putLayout({ ...layout, name: name.slice(0, 42), updatedAt: new Date().toISOString() });
+    } else if (button.dataset.action === 'duplicate') {
+      const now = new Date().toISOString();
+      await storage.putLayout({ ...clone(layout), id: newLayoutId(), name: `${layout.name} copy`.slice(0, 42), createdAt: now, updatedAt: now });
+    } else if (button.dataset.action === 'delete') {
+      if (!confirm(`Delete “${layout.name}” from this device?`)) return;
+      await storage.deleteLayout(layout.id);
+    }
+    await renderLayouts();
+  });
+
+  async function restoreLocalData() {
+    if (!storage) {
+      setSaveStatus('Local save unavailable');
+      return;
+    }
+    try {
+      await storage.ready();
+      const [hareDraft, tortoiseDraft, progress, lastTrack] = await Promise.all([
+        storage.getState('draft:hare'),
+        storage.getState('draft:tortoise'),
+        storage.getState(`progress:${LEVEL_ID}`),
+        storage.getState('lastTrack')
+      ]);
+      for (const [track, draft] of [['hare', hareDraft], ['tortoise', tortoiseDraft]]) {
+        if (draft?.levelId !== LEVEL_ID) continue;
+        const cleanPieces = sanitisePieces(draft.pieces);
+        if (cleanPieces) courses[track] = cleanPieces;
+      }
+      for (const track of ['hare', 'tortoise']) {
+        for (const category of ['overall', 'golden']) {
+          const value = progress?.[track]?.[category];
+          if (typeof value === 'number' && Number.isFinite(value) && value >= 0) best[track][category] = value;
+        }
+      }
+      storageReady = true;
+      activateMode(lastTrack, false);
+      setSaveStatus('Saved on this device');
+    } catch (_) {
+      storageReady = false;
+      setSaveStatus('Local save unavailable');
+    }
+  }
+
   function frame(now) {
     const elapsed = Math.min(.1, (now - lastFrame) / 1000);
     lastFrame = now;
@@ -408,5 +660,5 @@
     requestAnimationFrame(frame);
   }
 
-  resetCollectibles(); updateTools(); updateBest(); requestAnimationFrame(frame);
+  resetCollectibles(); updateTools(); updateBest(); restoreLocalData(); requestAnimationFrame(frame);
 })();

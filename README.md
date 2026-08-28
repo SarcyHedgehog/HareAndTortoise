@@ -15,6 +15,15 @@ Open `index.html` directly, or use VS Code Live Server. No build step, account, 
 - No Tortoise time limit; a valid journey may keep running until it reaches the goal
 - Piece fatigue to prevent endless scoring loops
 - Carrot and Golden Hedgehog bonus objects
-- Best scores, star ratings, synthesized sound and responsive touch controls
+- Device-local recovery of the current Hare and Tortoise courses
+- Named layouts with load, rename, duplicate and delete controls
+- Separate personal bests for each trail, including Golden Hedgehog runs
+- Star ratings, synthesized sound and responsive touch controls
 
 This is deliberately a vertical slice rather than a complete game. Progression, more worlds, a proper level editor and asynchronous challenges belong in later passes.
+
+## Local saves
+
+Courses, named layouts and personal bests are stored in IndexedDB in the current browser. They survive ordinary refreshes and restarts, but they are deliberately device-local: another browser, phone or web origin has its own save data. In particular, layouts created on a Live Server address will not automatically appear on the eventual production website.
+
+The records already identify the common level (`training-meadow`) and the independent Hare or Tortoise track. That leaves a clean route to shared Candy Crush-style levels later: a hosted service can own the canonical level catalogue, per-player unlock position and the two global leaderboards, while the Golden Hedgehog result remains a separate filter/category.
