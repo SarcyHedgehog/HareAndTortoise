@@ -226,13 +226,13 @@
     }
   }
 
-  function finish(success) {
+  function finish(success, failureReason = 'meadow') {
     if (!running) return;
     running = false; launchButton.disabled = false;
     const time = ball.age;
     if (success) {
       const collected = carrots.filter(c => c.got).length;
-      const scoreTime = mode === 'tortoise' ? Math.min(25, time) : time;
+      const scoreTime = time;
       const isBest = best[mode] == null || (mode === 'hare' ? scoreTime < best[mode] : scoreTime > best[mode]);
       if (isBest) best[mode] = scoreTime;
       const stars = mode === 'hare' ? (time < 5 ? 3 : time < 8 ? 2 : 1) : (time > 12 ? 3 : time > 8 ? 2 : 1);
@@ -251,7 +251,12 @@
       });
       sound('win'); updateBest();
     } else {
-      setMessage('Not quite a journey', ball.age >= 25 ? 'The sphere got sleepy. Try a less endless route.' : 'The sphere touched the meadow. Adjust and try again.', 3500);
+      const failureMessages = {
+        timeout: 'The Hare ran out of time. Build a quicker route.',
+        stopped: 'The sphere came to rest. Give it another nudge with the course.',
+        meadow: 'The sphere touched the meadow. Adjust and try again.'
+      };
+      setMessage('Not quite a journey', failureMessages[failureReason], 3500);
       sound('fail');
     }
   }
@@ -284,7 +289,9 @@
       for (const carrot of carrots) if (!carrot.got && Math.hypot(ball.x-carrot.x, ball.y-carrot.y) < 34) { carrot.got = true; sound('collect'); }
       if (!hedgehog.got && Math.hypot(ball.x-hedgehog.x, ball.y-hedgehog.y) < 34) { hedgehog.got = true; sound('collect'); }
       if (Math.hypot(ball.x - 1023, ball.y - 494) < 46) finish(true);
-      else if (ball.y > 590 || ball.age >= 25 || (Math.hypot(ball.vx, ball.vy) < 8 && ball.age > 2)) finish(false);
+      else if (ball.y > 590) finish(false, 'meadow');
+      else if (mode === 'hare' && ball.age >= 25) finish(false, 'timeout');
+      else if (Math.hypot(ball.vx, ball.vy) < 8 && ball.age > 2) finish(false, 'stopped');
     }
     celebration.forEach(p => { p.x += p.vx*dt; p.y += p.vy*dt; p.vy += 240*dt; p.life -= dt; });
     celebration = celebration.filter(p => p.life > 0);
