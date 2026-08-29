@@ -74,7 +74,7 @@
         },
         {
           id: 'green-3',
-          revision: 2,
+          revision: 3,
           number: 3,
           name: 'Pipe Dream',
           description: 'Build an elbow over the crate wall and drop the sphere down the chimney.',
@@ -85,15 +85,15 @@
             carrotClockEffectSeconds: 1
           },
           launcher: { x: 92, y: 170, vx: 315, vy: -12 },
-          goal: { x: 920, y: 505 },
-          carrots: [{ x: 410, y: 170 }, { x: 690, y: 145 }, { x: 920, y: 315 }],
-          goldenHedgehog: { x: 1000, y: 410 },
+          goal: { x: 1048, y: 505, captureRadius: 110 },
+          carrots: [{ x: 410, y: 170 }, { x: 690, y: 145 }, { x: 1010, y: 315 }],
+          goldenHedgehog: { x: 710, y: 355 },
           fixedObjects: [
-            { type: 'crate', x: 840, y: 520, width: 80, height: 78 },
-            { type: 'crate', x: 840, y: 440, width: 80, height: 78 },
-            { type: 'crate', x: 840, y: 360, width: 80, height: 78 },
-            { type: 'crate', x: 840, y: 280, width: 80, height: 78 },
-            { type: 'crate', x: 840, y: 200, width: 80, height: 78 }
+            { type: 'crate', x: 900, y: 520, width: 80, height: 78 },
+            { type: 'crate', x: 900, y: 440, width: 80, height: 78 },
+            { type: 'crate', x: 900, y: 360, width: 80, height: 78 },
+            { type: 'crate', x: 900, y: 280, width: 80, height: 78 },
+            { type: 'crate', x: 900, y: 200, width: 80, height: 78 }
           ],
           starter: {
             hare: [

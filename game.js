@@ -575,7 +575,7 @@
       }
       if (hedgehog && !hedgehog.got && Math.hypot(ball.x-hedgehog.x, ball.y-hedgehog.y) < 34) { hedgehog.got = true; sound('collect'); }
       const goal = level().goal;
-      if (Math.hypot(ball.x - goal.x, ball.y - goal.y) < 46) finish(true);
+      if (Math.hypot(ball.x - goal.x, ball.y - goal.y) < (goal.captureRadius || 46)) finish(true);
       else if (ball.y > 590) finish(false, 'meadow');
       else if (mode === 'hare' && ball.scoreAge >= 25) finish(false, 'timeout');
     }
