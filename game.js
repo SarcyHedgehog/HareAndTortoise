@@ -170,16 +170,25 @@
     return { ax: piece.x - dx, ay: piece.y - dy, bx: piece.x + dx, by: piece.y + dy };
   }
 
-  function pipeGeometry(piece) {
-    const localPoints = [[-62, 0], [0, 0], [0, 62]];
+  function transformPipePoints(piece, localPoints) {
     const cosine = Math.cos(piece.angle), sine = Math.sin(piece.angle);
-    return {
-      width: 68,
-      points: localPoints.map(([x, y]) => [
-        piece.x + x * cosine - y * sine,
-        piece.y + x * sine + y * cosine
-      ])
-    };
+    return localPoints.map(([x, y]) => [
+      piece.x + x * cosine - y * sine,
+      piece.y + x * sine + y * cosine
+    ]);
+  }
+
+  function pipeGeometry(piece) {
+    return { width: 68, points: transformPipePoints(piece, [[-62, 0], [0, 0], [0, 62]]) };
+  }
+
+  function pipeWalls(piece) {
+    return [
+      // The bevel replaces the square outer corner. An incoming sphere meets
+      // the diagonal face and is guided into the downward leg of the elbow.
+      transformPipePoints(piece, [[-62, -34], [-12, -34], [34, 12], [34, 62]]).map(([x, y]) => ({ x, y })),
+      transformPipePoints(piece, [[-62, 34], [-34, 34], [-34, 62]]).map(([x, y]) => ({ x, y }))
+    ];
   }
 
   function nearestPiece(point) {
@@ -334,7 +343,7 @@
     if (piece.tired) return;
     if (piece.type === 'pipe') {
       let bounced = false;
-      for (const wall of tubeWalls(pipeGeometry(piece))) {
+      for (const wall of pipeWalls(piece)) {
         for (let index = 1; index < wall.length; index++) {
           bounced = collideStaticSegment(wall[index - 1].x, wall[index - 1].y, wall[index].x, wall[index].y) || bounced;
         }
@@ -696,6 +705,9 @@
       ctx.shadowColor = 'transparent';
       ctx.strokeStyle = '#d6eee0'; ctx.lineWidth = 54; ctx.stroke();
       ctx.strokeStyle = 'rgba(255,255,255,.46)'; ctx.lineWidth = 4; ctx.stroke();
+      const deflector = pipeWalls(piece)[0];
+      ctx.beginPath(); ctx.moveTo(deflector[1].x, deflector[1].y); ctx.lineTo(deflector[2].x, deflector[2].y);
+      ctx.strokeStyle = '#43a957'; ctx.lineWidth = 9; ctx.lineCap = 'round'; ctx.stroke();
       ctx.restore();
       return;
     }
