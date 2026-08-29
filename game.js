@@ -7,6 +7,7 @@
   const bestEl = document.getElementById('best');
   const objectiveEl = document.getElementById('objective');
   const messageEl = document.getElementById('message');
+  const stallCountdownEl = document.getElementById('stall-countdown');
   const launchButton = document.getElementById('launch');
   const layoutDialog = document.getElementById('layout-dialog');
   const layoutList = document.getElementById('layout-list');
@@ -20,6 +21,13 @@
   const world = worlds[0];
   const levels = world.levels;
   const PHYSICS_VERSION = 2;
+  const GAME_CONFIG = Object.freeze({
+    stalledBall: Object.freeze({
+      countdownSeconds: 10,
+      settleSeconds: 0.75,
+      movementRadius: 2
+    })
+  });
 
   let mode = 'hare';
   let activeTool = 'select';
@@ -112,6 +120,36 @@
       delete clockEl.dataset.effect;
       clockEl.removeAttribute('aria-label');
     }
+  }
+
+  function hideStallCountdown() {
+    stallCountdownEl.classList.add('hidden');
+  }
+
+  function updateStallCountdown(dt) {
+    const config = GAME_CONFIG.stalledBall;
+    const movedFromAnchor = Math.hypot(ball.x - ball.stallAnchorX, ball.y - ball.stallAnchorY);
+    if (movedFromAnchor > config.movementRadius) {
+      ball.stallAnchorX = ball.x;
+      ball.stallAnchorY = ball.y;
+      ball.stallStillFor = 0;
+      ball.stallCountdownRemaining = config.countdownSeconds;
+      hideStallCountdown();
+      return;
+    }
+
+    ball.stallStillFor += dt;
+    if (ball.stallStillFor < config.settleSeconds) {
+      hideStallCountdown();
+      return;
+    }
+
+    ball.stallCountdownRemaining = Math.max(0, ball.stallCountdownRemaining - dt);
+    const secondsShown = String(Math.ceil(ball.stallCountdownRemaining));
+    const secondsEl = stallCountdownEl.querySelector('strong');
+    if (secondsEl.textContent !== secondsShown) secondsEl.textContent = secondsShown;
+    stallCountdownEl.classList.remove('hidden');
+    if (ball.stallCountdownRemaining <= 0) finish(false, 'stopped');
   }
 
   function scheduleDraftSave(track = mode, levelId = currentLevelId) {
@@ -354,9 +392,15 @@
     pieces().forEach(p => { p.hits = 0; p.tired = false; });
     selectedId = null;
     const launcher = level().launcher;
-    ball = { x: launcher.x, y: launcher.y, vx: launcher.vx, vy: launcher.vy, radius: 18, trail: [], age: 0, scoreAge: 0, clockEffectRemaining: 0 };
+    ball = {
+      x: launcher.x, y: launcher.y, vx: launcher.vx, vy: launcher.vy,
+      radius: 18, trail: [], age: 0, scoreAge: 0, clockEffectRemaining: 0,
+      stallAnchorX: launcher.x, stallAnchorY: launcher.y, stallStillFor: 0,
+      stallCountdownRemaining: GAME_CONFIG.stalledBall.countdownSeconds
+    };
     running = true; simulationAccumulator = 0; launchButton.disabled = true;
     updateClockEffect();
+    hideStallCountdown();
     messageEl.classList.add('hidden'); sound('launch');
   });
 
@@ -525,6 +569,7 @@
   function finish(success, failureReason = 'meadow') {
     if (!running) return;
     running = false; launchButton.disabled = false;
+    hideStallCountdown();
     updateClockEffect();
     const time = ball.scoreAge;
     if (success) {
@@ -615,6 +660,7 @@
       if (ballTouchesGoal(goal)) finish(true);
       else if (ball.y > 590) finish(false, 'meadow');
       else if (mode === 'hare' && ball.scoreAge >= 25) finish(false, 'timeout');
+      else updateStallCountdown(dt);
     }
     celebration.forEach(p => { p.x += p.vx*dt; p.y += p.vy*dt; p.vy += 240*dt; p.life -= dt; });
     celebration = celebration.filter(p => p.life > 0);
