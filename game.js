@@ -517,6 +517,11 @@
     return track === 'hare' ? time <= par : time >= par;
   }
 
+  function ballTouchesGoal(goal) {
+    const goalRadius = goal.radius || 34;
+    return Math.hypot(ball.x - goal.x, ball.y - goal.y) <= ball.radius + goalRadius;
+  }
+
   function finish(success, failureReason = 'meadow') {
     if (!running) return;
     running = false; launchButton.disabled = false;
@@ -607,7 +612,7 @@
       updateClockEffect();
       if (hedgehog && !hedgehog.got && Math.hypot(ball.x-hedgehog.x, ball.y-hedgehog.y) < 34) { hedgehog.got = true; sound('collect'); }
       const goal = level().goal;
-      if (Math.hypot(ball.x - goal.x, ball.y - goal.y) < (goal.captureRadius || 46)) finish(true);
+      if (ballTouchesGoal(goal)) finish(true);
       else if (ball.y > 590) finish(false, 'meadow');
       else if (mode === 'hare' && ball.scoreAge >= 25) finish(false, 'timeout');
     }
@@ -665,7 +670,8 @@
 
   function drawGoal() {
     const goal = level().goal;
-    ctx.strokeStyle = '#173b3a'; ctx.lineWidth = 8; ctx.beginPath(); ctx.arc(goal.x,goal.y,34,0,Math.PI*2); ctx.stroke();
+    const radius = goal.radius || 34;
+    ctx.strokeStyle = '#173b3a'; ctx.lineWidth = 8; ctx.beginPath(); ctx.arc(goal.x,goal.y,radius,0,Math.PI*2); ctx.stroke();
     ctx.fillStyle = '#f4e6c1'; ctx.beginPath(); ctx.arc(goal.x,goal.y,25,0,Math.PI*2); ctx.fill();
     ctx.fillStyle = '#173b3a'; ctx.font = '800 11px system-ui'; ctx.textAlign = 'center'; ctx.fillText('GOAL',goal.x,goal.y+4); ctx.textAlign='left';
   }

@@ -85,7 +85,7 @@
             carrotClockEffectSeconds: 1
           },
           launcher: { x: 92, y: 170, vx: 315, vy: -12 },
-          goal: { x: 1048, y: 505, captureRadius: 110 },
+          goal: { x: 1048, y: 505, radius: 34 },
           carrots: [{ x: 410, y: 170 }, { x: 690, y: 145 }, { x: 1010, y: 315 }],
           goldenHedgehog: { x: 710, y: 355 },
           fixedObjects: [
