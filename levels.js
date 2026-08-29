@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const commonInventory = { platform: 4, ramp: 2, spring: 2 };
+  const commonInventory = { platform: 4, ramp: 2, spring: 2, pipe: 0 };
 
   window.HareTortoiseWorlds = [
     {
@@ -48,7 +48,7 @@
           number: 2,
           name: 'The Green Block',
           description: 'One very solid square stands between drop-off and goal.',
-          inventory: { platform: 3, ramp: 2, spring: 2 },
+          inventory: { platform: 3, ramp: 2, spring: 2, pipe: 0 },
           scoring: {
             hare: { par: 14, stars: { one: 14, two: 10, three: 7 } },
             tortoise: { par: 12, stars: { one: 12, two: 18, three: 26 } },
@@ -74,30 +74,33 @@
         },
         {
           id: 'green-3',
-          revision: 1,
+          revision: 2,
           number: 3,
           name: 'Pipe Dream',
-          description: 'A green tube and a proper ninety-degree bend do most of the steering.',
-          inventory: { platform: 3, ramp: 2, spring: 1 },
+          description: 'Build an elbow over the crate wall and drop the sphere down the chimney.',
+          inventory: { platform: 2, ramp: 2, spring: 1, pipe: 1 },
           scoring: {
             hare: { par: 16, stars: { one: 16, two: 11, three: 8 } },
             tortoise: { par: 14, stars: { one: 14, two: 22, three: 32 } },
             carrotClockEffectSeconds: 1
           },
           launcher: { x: 92, y: 170, vx: 315, vy: -12 },
-          goal: { x: 710, y: 512 },
-          carrots: [{ x: 410, y: 170 }, { x: 650, y: 170 }, { x: 710, y: 385 }],
-          goldenHedgehog: { x: 845, y: 320 },
+          goal: { x: 920, y: 505 },
+          carrots: [{ x: 410, y: 170 }, { x: 690, y: 145 }, { x: 920, y: 315 }],
+          goldenHedgehog: { x: 1000, y: 410 },
           fixedObjects: [
-            { type: 'tube', points: [[300, 170], [710, 170], [710, 430]], width: 82, color: '#39a852' },
-            { type: 'block', x: 875, y: 480, width: 105, height: 70, color: '#4f8f45' }
+            { type: 'crate', x: 840, y: 520, width: 80, height: 78 },
+            { type: 'crate', x: 840, y: 440, width: 80, height: 78 },
+            { type: 'crate', x: 840, y: 360, width: 80, height: 78 },
+            { type: 'crate', x: 840, y: 280, width: 80, height: 78 },
+            { type: 'crate', x: 840, y: 200, width: 80, height: 78 }
           ],
           starter: {
             hare: [
-              { type: 'platform', x: 710, y: 500, angle: 0 }
+              { type: 'platform', x: 610, y: 245, angle: 0 }
             ],
             tortoise: [
-              { type: 'platform', x: 710, y: 500, angle: 0 }
+              { type: 'platform', x: 610, y: 245, angle: 0 }
             ]
           }
         }

@@ -162,7 +162,7 @@
     };
   }
 
-  function pieceLength(piece) { return piece.type === 'platform' ? 155 : piece.type === 'ramp' ? 130 : 105; }
+  function pieceLength(piece) { return piece.type === 'platform' ? 155 : piece.type === 'ramp' ? 130 : piece.type === 'pipe' ? 124 : 105; }
   function segment(piece) {
     const half = pieceLength(piece) / 2;
     const dx = Math.cos(piece.angle) * half;
@@ -170,11 +170,24 @@
     return { ax: piece.x - dx, ay: piece.y - dy, bx: piece.x + dx, by: piece.y + dy };
   }
 
+  function pipeGeometry(piece) {
+    const localPoints = [[-62, 0], [0, 0], [0, 62]];
+    const cosine = Math.cos(piece.angle), sine = Math.sin(piece.angle);
+    return {
+      width: 68,
+      points: localPoints.map(([x, y]) => [
+        piece.x + x * cosine - y * sine,
+        piece.y + x * sine + y * cosine
+      ])
+    };
+  }
+
   function nearestPiece(point) {
     let winner = null, distance = 34;
     for (const piece of pieces()) {
       const d = Math.hypot(point.x - piece.x, point.y - piece.y);
-      if (d < distance) { winner = piece; distance = d; }
+      const reach = piece.type === 'pipe' ? 78 : distance;
+      if (d < reach && (!winner || d < distance)) { winner = piece; distance = d; }
     }
     return winner;
   }
@@ -184,7 +197,11 @@
     for (const type of Object.keys(limits)) document.getElementById(`count-${type}`).textContent = remaining(type);
     const total = Object.keys(limits).reduce((n, type) => n + remaining(type), 0);
     document.getElementById('remaining').textContent = `${total} pieces available`;
-    document.querySelectorAll('.tool').forEach(el => el.classList.toggle('selected', el.dataset.tool === activeTool));
+    document.querySelectorAll('.tool').forEach(el => {
+      const type = el.dataset.tool;
+      el.disabled = type !== 'select' && (limits[type] || 0) <= 0;
+      el.classList.toggle('selected', type === activeTool);
+    });
   }
 
   let dragging = false;
@@ -228,7 +245,7 @@
   document.getElementById('rotate').addEventListener('click', () => {
     if (running) return;
     const piece = pieces().find(p => p.id === selectedId);
-    if (piece) { piece.angle += Math.PI / 4; sound('bounce'); scheduleDraftSave(); }
+    if (piece) { piece.angle += piece.type === 'pipe' ? Math.PI / 2 : Math.PI / 4; sound('bounce'); scheduleDraftSave(); }
   });
   document.getElementById('delete').addEventListener('click', () => {
     if (running || selectedId == null) return;
@@ -315,6 +332,23 @@
 
   function collidePiece(piece) {
     if (piece.tired) return;
+    if (piece.type === 'pipe') {
+      let bounced = false;
+      for (const wall of tubeWalls(pipeGeometry(piece))) {
+        for (let index = 1; index < wall.length; index++) {
+          bounced = collideStaticSegment(wall[index - 1].x, wall[index - 1].y, wall[index].x, wall[index].y) || bounced;
+        }
+      }
+      if (bounced) {
+        piece.hits++;
+        sound('bounce');
+        if (piece.hits >= 8) {
+          piece.tired = true;
+          setMessage('A tired elbow gave way', 'The pipe has had quite enough excitement.');
+        }
+      }
+      return;
+    }
     const s = segment(piece);
     const vx = s.bx - s.ax, vy = s.by - s.ay;
     const len2 = vx * vx + vy * vy;
@@ -324,7 +358,7 @@
     const dx = ball.x - px, dy = ball.y - py;
     const distance = Math.hypot(dx, dy);
     const thickness = 7;
-    if (distance > ball.radius + thickness) return;
+    if (distance > ball.radius + thickness) return false;
 
     // Each construction piece is a solid capsule: both long faces and the
     // rounded ends collide. If the centre lands exactly on the segment, use
@@ -376,6 +410,7 @@
       ball.vx = (ball.vx - 2 * approach * nx) * .86;
       ball.vy = (ball.vy - 2 * approach * ny) * .86;
     }
+    return approach < 0;
   }
 
   function tubeWalls(tube) {
@@ -430,7 +465,7 @@
 
   function collideFixedObjects() {
     for (const object of level().fixedObjects || []) {
-      if (object.type === 'block') collideBlock(object);
+      if (object.type === 'block' || object.type === 'crate') collideBlock(object);
       if (object.type === 'tube') {
         for (const wall of tubeWalls(object)) {
           for (let index = 1; index < wall.length; index++) {
@@ -604,6 +639,19 @@
   }
 
   function drawFixedObject(object) {
+    if (object.type === 'crate') {
+      const left = object.x - object.width / 2, top = object.y - object.height / 2;
+      ctx.save();
+      ctx.fillStyle = '#9b6538'; ctx.strokeStyle = '#543b28'; ctx.lineWidth = 7;
+      ctx.beginPath(); ctx.roundRect(left, top, object.width, object.height, 5); ctx.fill(); ctx.stroke();
+      ctx.strokeStyle = '#d6a260'; ctx.lineWidth = 5;
+      ctx.beginPath();
+      ctx.moveTo(left + 10, top + 10); ctx.lineTo(left + object.width - 10, top + object.height - 10);
+      ctx.moveTo(left + object.width - 10, top + 10); ctx.lineTo(left + 10, top + object.height - 10);
+      ctx.stroke();
+      ctx.fillStyle = 'rgba(255,231,174,.28)'; ctx.fillRect(left + 7, top + 7, object.width - 14, 5);
+      ctx.restore();
+    }
     if (object.type === 'block') {
       const left = object.x - object.width / 2, top = object.y - object.height / 2;
       ctx.save();
@@ -633,6 +681,24 @@
   }
 
   function drawPiece(piece) {
+    if (piece.type === 'pipe') {
+      const pipe = pipeGeometry(piece);
+      ctx.save(); ctx.lineJoin = 'round'; ctx.lineCap = 'butt';
+      ctx.beginPath();
+      pipe.points.forEach(([x, y], index) => index ? ctx.lineTo(x, y) : ctx.moveTo(x, y));
+      if (piece.tired) ctx.globalAlpha = .25;
+      ctx.shadowColor = 'rgba(16,48,41,.32)'; ctx.shadowBlur = 9; ctx.shadowOffsetY = 5;
+      if (piece.id === selectedId) {
+        ctx.strokeStyle = '#fff7d0'; ctx.lineWidth = 88; ctx.stroke();
+      }
+      ctx.strokeStyle = '#205d38'; ctx.lineWidth = 82; ctx.stroke();
+      ctx.strokeStyle = '#43a957'; ctx.lineWidth = 74; ctx.stroke();
+      ctx.shadowColor = 'transparent';
+      ctx.strokeStyle = '#d6eee0'; ctx.lineWidth = 54; ctx.stroke();
+      ctx.strokeStyle = 'rgba(255,255,255,.46)'; ctx.lineWidth = 4; ctx.stroke();
+      ctx.restore();
+      return;
+    }
     const s = segment(piece);
     ctx.save();
     if (piece.tired) ctx.globalAlpha = .25;

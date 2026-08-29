@@ -79,6 +79,7 @@ h1 i { color: var(--gold); font-weight: 400; }
 .tool small { color: var(--muted); font-size: 10px; }
 .tool em { color: var(--gold); font-style: normal; font-weight: 800; }
 .tool:hover, .tool.selected { border-color: var(--gold); background: rgba(243,202,82,.1); }
+.tool:disabled { opacity: .34; cursor: not-allowed; filter: grayscale(.8); }
 .edit-tools { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: 12px 0; }
 .edit-tools button, .reset, .layout-button { padding: 9px 5px; color: var(--muted); border: 1px solid var(--line); border-radius: 10px; background: transparent; cursor: pointer; }
 .edit-tools span { display: block; font-size: 9px; }
@@ -223,7 +224,7 @@ h1 i { color: var(--gold); font-weight: 400; }
   .message span { font-size: 9px; }
   .toolbox {
     position: absolute; z-index: 7; inset: auto 0 0; height: 78px;
-    min-width: 100%; display: grid; grid-template-columns: repeat(9, minmax(76px,1fr));
+    min-width: 100%; display: grid; grid-template-columns: repeat(10, minmax(76px,1fr));
     gap: 5px; padding: 6px max(6px, env(safe-area-inset-right)) max(6px, env(safe-area-inset-bottom)) max(6px, env(safe-area-inset-left));
     overflow-x: auto; overflow-y: hidden; border: 0; border-top: 1px solid var(--line);
     background: rgba(16,44,44,.92); backdrop-filter: blur(9px);

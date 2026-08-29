@@ -11,10 +11,10 @@ Open `index.html` directly, or use VS Code Live Server. No build step, account, 
 - Three canonical Green Meadows levels, selected from the level strip
 - Independent Hare and Tortoise progression: beat par to unlock the next level on that trail
 - Per-level par and one-, two- and three-star thresholds held in `levels.js`
-- Permanent level geometry that does not consume inventory, including solid green blocks and an open-ended green tube with a 90-degree bend
+- Permanent level geometry that does not consume inventory, including solid green blocks and crate walls
 - Separate Hare and Tortoise course layouts
 - Opposing fastest/longest scoring objectives
-- Placeable, draggable and rotatable platforms, ramps and springs
+- Placeable, draggable and rotatable platforms, ramps, springs and compact green pipe elbows
 - Deterministic fixed-step local physics: unchanged layouts repeat exactly
 - No Tortoise time limit; a valid journey may keep running until it reaches the goal
 - Piece fatigue to prevent endless scoring loops
