@@ -26,6 +26,7 @@ Open `index.html` directly, or use VS Code Live Server. No build step, account, 
 - Star ratings, synthesized sound and responsive touch controls
 - Landscape-first tablet and phone presentation with a full-size playfield, compact touch shed and portrait rotation prompt
 - Desktop level workshop at `editor.html`, with canvas placement, separate Hare/Tortoise starting layouts, scoring, inventory, background choice, local drafts and JSON import/export
+- Clubhouse lobby with separate Hare/Tortoise map progress, personal leaderboard summaries and explicit device-local group create/join/leave/rejoin flows
 
 This is deliberately a vertical slice rather than a complete game. More worlds, editor play-testing and asynchronous challenges belong in later passes.
 
@@ -38,3 +39,5 @@ Open `editor.html` through the same Live Server as the game. Existing levels can
 Courses, named layouts and personal bests are stored in IndexedDB in the current browser. They survive ordinary refreshes and restarts, but they are deliberately device-local: another browser, phone or web origin has its own save data. In particular, layouts created on a Live Server address will not automatically appear on the eventual production website.
 
 Canonical level definitions live only in `levels.js`. Saved player state stores the level ID, independent Hare/Tortoise unlock results, scores and player-placed pieces; it does not duplicate level geometry or scoring rules. That leaves a clean route to hosted Candy Crush-style progression later: a service can own player identity and the two global leaderboards while every client continues to use the same versioned level catalogue. Golden Hedgehog results remain a separate filter/category.
+
+The clubhouse deliberately keeps group membership local in this foundation build and labels it as such. `lobby.js` separates that social state from layouts and consumes progress through a small game event/API boundary. A hosted identity and leaderboard service can replace the local social adapter without uploading private saved layouts.
