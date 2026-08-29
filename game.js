@@ -96,6 +96,24 @@
 
   function setSaveStatus(text) { saveStatusEl.textContent = text; }
 
+  function updateClockEffect() {
+    const active = Boolean(running && ball && ball.clockEffectRemaining > 0);
+    const frozen = active && mode === 'hare';
+    const fired = active && mode === 'tortoise';
+    clockEl.classList.toggle('clock-frozen', frozen);
+    clockEl.classList.toggle('clock-fired', fired);
+    if (frozen) {
+      clockEl.dataset.effect = '❄ TIME FROZEN';
+      clockEl.setAttribute('aria-label', `${clockEl.textContent}, carrot bonus: time frozen`);
+    } else if (fired) {
+      clockEl.dataset.effect = '🔥 TIME ×2';
+      clockEl.setAttribute('aria-label', `${clockEl.textContent}, carrot challenge: time running at double speed`);
+    } else {
+      delete clockEl.dataset.effect;
+      clockEl.removeAttribute('aria-label');
+    }
+  }
+
   function scheduleDraftSave(track = mode, levelId = currentLevelId) {
     if (!storageReady) return;
     const snapshot = courseSnapshot(track, levelId);
@@ -266,6 +284,7 @@
     courses[currentLevelId][mode] = freshPieces(level().starter[mode]); selectedId = null; running = false; ball = null;
     simulationAccumulator = 0;
     resetCollectibles(); updateTools(); launchButton.disabled = false; clockEl.textContent = '0.00s';
+    updateClockEffect();
     scheduleDraftSave();
     setMessage('Course restored', `${level().name}'s starting layout is ready again.`);
   });
@@ -305,6 +324,7 @@
     limits = clone(level().inventory);
     running = false; ball = null; selectedId = null; activeTool = 'select';
     simulationAccumulator = 0; launchButton.disabled = false; clockEl.textContent = '0.00s';
+    updateClockEffect();
     resetCollectibles(); updateTools(); updateBest(); renderLevelNav();
     if (storageReady) storage.setState(`lastLevel:${mode}`, levelId).catch(() => {});
     if (announce) setMessage(level().name, level().description || `Beat par to open the next ${mode} trail.`);
@@ -336,6 +356,7 @@
     const launcher = level().launcher;
     ball = { x: launcher.x, y: launcher.y, vx: launcher.vx, vy: launcher.vy, radius: 18, trail: [], age: 0, scoreAge: 0, clockEffectRemaining: 0 };
     running = true; simulationAccumulator = 0; launchButton.disabled = true;
+    updateClockEffect();
     messageEl.classList.add('hidden'); sound('launch');
   });
 
@@ -499,6 +520,7 @@
   function finish(success, failureReason = 'meadow') {
     if (!running) return;
     running = false; launchButton.disabled = false;
+    updateClockEffect();
     const time = ball.scoreAge;
     if (success) {
       const collected = carrots.filter(c => c.got).length;
@@ -582,6 +604,7 @@
         ball.clockEffectRemaining += level().scoring.carrotClockEffectSeconds;
         sound('collect');
       }
+      updateClockEffect();
       if (hedgehog && !hedgehog.got && Math.hypot(ball.x-hedgehog.x, ball.y-hedgehog.y) < 34) { hedgehog.got = true; sound('collect'); }
       const goal = level().goal;
       if (Math.hypot(ball.x - goal.x, ball.y - goal.y) < (goal.captureRadius || 46)) finish(true);
@@ -834,6 +857,7 @@
     if (!cleanPieces) throw new Error('This layout is not valid.');
     running = false; ball = null; simulationAccumulator = 0;
     launchButton.disabled = false; clockEl.textContent = '0.00s';
+    updateClockEffect();
     courses[levelId][track] = cleanPieces;
     lastLevelByTrack[track] = levelId;
     activateMode(track, false);

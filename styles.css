@@ -58,7 +58,17 @@ h1 i { color: var(--gold); font-weight: 400; }
 .mode.active[data-mode="tortoise"] { background: #30451f; box-shadow: inset 0 -4px var(--tortoise); }
 .scoreboard { display: grid; grid-template-columns: 1fr auto; grid-template-rows: 1fr 1fr; align-items: center; padding: 16px 24px; }
 .scoreboard span { align-self: end; color: var(--gold); font-size: 11px; font-weight: 800; letter-spacing: .14em; }
-.scoreboard strong { grid-row: 1 / 3; grid-column: 2; font: 800 clamp(30px, 4vw, 52px)/1 Georgia, serif; font-variant-numeric: tabular-nums; }
+.scoreboard strong { position: relative; grid-row: 1 / 3; grid-column: 2; font: 800 clamp(30px, 4vw, 52px)/1 Georgia, serif; font-variant-numeric: tabular-nums; }
+.scoreboard strong[data-effect]::after {
+  content: attr(data-effect); position: absolute; top: calc(100% + 2px); right: 0;
+  width: max-content; padding: 3px 7px; border: 1px solid currentColor; border-radius: 99px;
+  font: 900 9px/1 system-ui; letter-spacing: .08em; background: rgba(7,27,28,.84);
+}
+.clock-frozen { color: #dffbff; text-shadow: 0 0 8px #79e5f2, 0 0 22px rgba(121,229,242,.9); animation: clock-freeze .7s ease-in-out infinite; }
+.clock-fired { color: #ffd063; text-shadow: 0 -2px 8px #ff682f, 0 0 22px rgba(255,80,20,.95); animation: clock-fire .18s ease-in-out infinite alternate; }
+@keyframes clock-freeze { 50% { transform: scale(1.045); filter: brightness(1.18); } }
+@keyframes clock-fire { from { transform: translateY(1px) scale(1); } to { transform: translateY(-1px) scale(1.045); filter: brightness(1.2); } }
+@media (prefers-reduced-motion: reduce) { .clock-frozen, .clock-fired { animation: none; } }
 .scoreboard small { color: var(--muted); }
 
 .workbench { display: grid; grid-template-columns: minmax(0, 1fr) 190px; min-height: 620px; }

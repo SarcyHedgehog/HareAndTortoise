@@ -18,7 +18,7 @@ Open `index.html` directly, or use VS Code Live Server. No build step, account, 
 - Deterministic fixed-step local physics: unchanged layouts repeat exactly
 - No Tortoise time limit; a valid journey may keep running until it reaches the goal
 - Piece fatigue to prevent endless scoring loops
-- Carrot clock effects (one second frozen for Hare, one second at double speed for Tortoise) without changing sphere velocity
+- Obvious carrot clock effects (icy freeze for Hare, fiery double speed for Tortoise) without changing sphere velocity or trajectory
 - Golden Hedgehog secondary challenges
 - Device-local recovery of the current Hare and Tortoise courses
 - Named layouts with load, rename, duplicate and delete controls
