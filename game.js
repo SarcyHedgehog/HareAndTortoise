@@ -44,10 +44,11 @@
   const saveTimers = {};
   const FIXED_STEP = 1 / 120;
   let simulationAccumulator = 0;
+  const backgroundImageCache = new Map();
 
   function clone(value) { return JSON.parse(JSON.stringify(value)); }
   let currentLevelId = levels[0].id;
-  let limits = clone(levels[0].inventory);
+  let limits = pieceLimits(levels[0].id, mode);
   const courses = Object.fromEntries(levels.map(entry => [entry.id, {
     hare: freshPieces(entry.starter.hare),
     tortoise: freshPieces(entry.starter.tortoise)
@@ -68,11 +69,22 @@
 
   function validTrack(value) { return value === 'tortoise' ? 'tortoise' : 'hare'; }
 
-  function sanitisePieces(value, levelId = currentLevelId) {
+  function pieceLimits(levelId = currentLevelId, track = mode) {
+    const entry = level(levelId);
+    if (!entry.availablePieces) return clone(entry.inventory || {});
+    const totals = {};
+    for (const type of Object.keys(entry.availablePieces)) {
+      const placed = (entry.starter?.[track] || []).filter(piece => piece.type === type).length;
+      totals[type] = entry.availablePieces[type] + placed;
+    }
+    return totals;
+  }
+
+  function sanitisePieces(value, levelId = currentLevelId, track = mode) {
     if (!Array.isArray(value)) return null;
-    const inventory = level(levelId).inventory;
+    const inventory = pieceLimits(levelId, track);
     const allowed = new Set(Object.keys(inventory));
-    const counts = { platform: 0, ramp: 0, spring: 0 };
+    const counts = { platform: 0, ramp: 0, spring: 0, pipe: 0 };
     const result = [];
     for (const raw of value) {
       if (!allowed.has(raw?.type) || counts[raw.type] >= inventory[raw.type]) continue;
@@ -359,7 +371,7 @@
     if (!isLevelUnlocked(levelId)) return false;
     currentLevelId = levelId;
     lastLevelByTrack[mode] = levelId;
-    limits = clone(level().inventory);
+    limits = pieceLimits(currentLevelId, mode);
     running = false; ball = null; selectedId = null; activeTool = 'select';
     simulationAccumulator = 0; launchButton.disabled = false; clockEl.textContent = '0.00s';
     updateClockEffect();
@@ -373,7 +385,7 @@
     mode = validTrack(track);
     const preferred = lastLevelByTrack[mode];
     currentLevelId = isLevelUnlocked(preferred, mode) ? preferred : highestUnlocked(mode);
-    limits = clone(level().inventory);
+    limits = pieceLimits(currentLevelId, mode);
     document.querySelectorAll('.mode').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
     objectiveEl.textContent = mode === 'hare' ? 'FASTEST SUCCESSFUL RUN' : 'LONGEST VALID JOURNEY';
     activeTool = 'select'; selectedId = null; resetCollectibles(); updateTools(); updateBest(); renderLevelNav();
@@ -671,6 +683,21 @@
   }
 
   function drawBackground() {
+    const background = level().background;
+    if (background?.type === 'image' && background.image) {
+      let image = backgroundImageCache.get(background.image);
+      if (!image) {
+        image = new Image();
+        image.onload = draw;
+        image.src = background.image;
+        backgroundImageCache.set(background.image, image);
+      }
+      if (image.complete && image.naturalWidth) {
+        ctx.drawImage(image, 0, 0, 1100, 620);
+        drawGridAndRoof();
+        return;
+      }
+    }
     const sky = ctx.createLinearGradient(0, 0, 0, 560);
     sky.addColorStop(0, '#a8d9dd'); sky.addColorStop(.68, '#d9ebc7'); sky.addColorStop(1, '#8fc071');
     ctx.fillStyle = sky; ctx.fillRect(0,0,1100,620);
@@ -684,6 +711,10 @@
     ctx.fillStyle = '#426f4d'; ctx.fillRect(0,560,1100,60);
     ctx.fillStyle = '#5b8e55';
     for (let x=0; x<1100; x+=22) { ctx.beginPath(); ctx.moveTo(x,560); ctx.lineTo(x+8,548-(x%3)*3); ctx.lineTo(x+12,560); ctx.fill(); }
+    drawGridAndRoof();
+  }
+
+  function drawGridAndRoof() {
     ctx.strokeStyle = 'rgba(27,69,62,.12)'; ctx.lineWidth = 1;
     for (let x=25; x<1100; x+=50) { ctx.beginPath(); ctx.moveTo(x,80); ctx.lineTo(x,540); ctx.stroke(); }
     for (let y=90; y<540; y+=50) { ctx.beginPath(); ctx.moveTo(20,y); ctx.lineTo(1080,y); ctx.stroke(); }
@@ -905,7 +936,7 @@
     const track = validTrack(layout.track);
     const levelId = layout.levelId === 'training-meadow' ? 'green-1' : layout.levelId;
     if (!levels.some(entry => entry.id === levelId)) throw new Error('This layout belongs to an unknown level.');
-    const cleanPieces = sanitisePieces(layout.pieces, levelId);
+    const cleanPieces = sanitisePieces(layout.pieces, levelId, track);
     if (!cleanPieces) throw new Error('This layout is not valid.');
     running = false; ball = null; simulationAccumulator = 0;
     launchButton.disabled = false; clockEl.textContent = '0.00s';
@@ -989,12 +1020,12 @@
       for (const entry of levels) {
         for (const track of ['hare', 'tortoise']) {
           const draft = drafts[draftIndex++];
-          const cleanPieces = draft?.levelId === entry.id ? sanitisePieces(draft.pieces, entry.id) : null;
+          const cleanPieces = draft?.levelId === entry.id ? sanitisePieces(draft.pieces, entry.id, track) : null;
           if (cleanPieces) courses[entry.id][track] = cleanPieces;
         }
       }
       for (const [track, oldDraft] of [['hare', oldHareDraft], ['tortoise', oldTortoiseDraft]]) {
-        const cleanPieces = sanitisePieces(oldDraft?.pieces, 'green-1');
+        const cleanPieces = sanitisePieces(oldDraft?.pieces, 'green-1', track);
         if (cleanPieces && !drafts[['hare', 'tortoise'].indexOf(track)]) courses['green-1'][track] = cleanPieces;
       }
       for (const entry of levels) {

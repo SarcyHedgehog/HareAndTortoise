@@ -25,8 +25,13 @@ Open `index.html` directly, or use VS Code Live Server. No build step, account, 
 - Separate personal bests for each trail, including Golden Hedgehog runs
 - Star ratings, synthesized sound and responsive touch controls
 - Landscape-first tablet and phone presentation with a full-size playfield, compact touch shed and portrait rotation prompt
+- Desktop level workshop at `editor.html`, with canvas placement, separate Hare/Tortoise starting layouts, scoring, inventory, background choice, local drafts and JSON import/export
 
-This is deliberately a vertical slice rather than a complete game. More worlds, a proper level editor and asynchronous challenges belong in later passes.
+This is deliberately a vertical slice rather than a complete game. More worlds, editor play-testing and asynchronous challenges belong in later passes.
+
+## Level workshop
+
+Open `editor.html` through the same Live Server as the game. Existing levels can be loaded as starting points. The editor treats the piece counts as pieces available in addition to the starting layout, and exports a single package containing the world reference and canonical level definition. Backgrounds can use the procedural meadow preset or an image URL; the game falls back to the procedural meadow while an image is unavailable.
 
 ## Local saves
 
