@@ -26,7 +26,7 @@ Open `index.html` directly, or use VS Code Live Server. No build step, account, 
 - Star ratings, synthesized sound and responsive touch controls
 - Landscape-first tablet and phone presentation with a full-size playfield, compact touch shed and portrait rotation prompt
 - Desktop level workshop at `editor.html`, with canvas placement, separate Hare/Tortoise starting layouts, scoring, inventory, background choice, local drafts and JSON import/export
-- Clubhouse lobby with separate Hare/Tortoise map progress, personal leaderboard summaries and explicit device-local group create/join/leave/rejoin flows
+- Clubhouse lobby with separate Hare/Tortoise map progress, per-level ordinary and Golden Hedgehog group records, a record-holder summary and group create/join/leave/rejoin flows
 
 This is deliberately a vertical slice rather than a complete game. More worlds, editor play-testing and asynchronous challenges belong in later passes.
 
@@ -40,4 +40,4 @@ Courses, named layouts and personal bests are stored in IndexedDB in the current
 
 Canonical level definitions live only in `levels.js`. Saved player state stores the level ID, independent Hare/Tortoise unlock results, scores and player-placed pieces; it does not duplicate level geometry or scoring rules. That leaves a clean route to hosted Candy Crush-style progression later: a service can own player identity and the two global leaderboards while every client continues to use the same versioned level catalogue. Golden Hedgehog results remain a separate filter/category.
 
-The clubhouse uses the protected PHP score service hosted at `www.ariolasoft.com/hare-and-tortoise-api/` for device identities, group membership and group leaderboards. It falls back to the last locally cached state when offline. `lobby.js` sends only the player name, stable device identity and canonical level results; private course drafts and named layouts are never uploaded.
+The clubhouse uses the protected PHP score service hosted at `www.ariolasoft.com/hare-and-tortoise-api/` for device identities, group membership and per-level group records. Ordinary and Golden Hedgehog runs are separate challenges; the Hare rewards the fastest successful time and the Tortoise the slowest. It falls back to personal local records when offline. `lobby.js` sends only the player name, stable device identity and canonical level results; private course drafts and named layouts are never uploaded.
