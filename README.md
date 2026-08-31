@@ -36,6 +36,8 @@ Open `editor.html` through the same Live Server as the game. Existing levels can
 
 The canonical starting layout is shared by the Hare and Tortoise. Their timing rules, progress and player-edited courses remain independent, but both trails always begin with the same designed map. The editor imports older version-1 packages containing separate `starter.hare` and `starter.tortoise` arrays and converts them to one shared layout on export.
 
+Starting pieces supplied by the level are locked in the game and drawn in blue-grey. They participate in physics but cannot be selected, moved, rotated or removed. Player-placed pieces retain the original colours and remain editable. Saved courses store only player-placed pieces; older saves are migrated by restoring the canonical locked pieces and retaining the remaining player construction.
+
 ## Placement grid
 
 Player pieces snap by their centre point to the pinboard grid while they are placed or dragged. The defaults are kept in `config.js`: change `placementGrid.size` to try a different spacing, set `enabled` to `false` to compare free placement, or set `showDots` to `false` to hide the guide. Existing saved layouts retain their original coordinates until an individual piece is moved, so changing the setting does not silently alter old courses.
