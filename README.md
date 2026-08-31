@@ -8,7 +8,7 @@ Open `index.html` directly, or use VS Code Live Server. No build step, account, 
 
 ## Included in this pass
 
-- Three canonical Green Meadows levels, selected from the level strip
+- Eight canonical Green Meadows levels, selected from the level strip
 - Independent Hare and Tortoise progression: beat par to unlock the next level on that trail
 - Per-level par and one-, two- and three-star thresholds held in `levels.js`
 - Permanent level geometry that does not consume inventory, including solid green blocks and crate walls
