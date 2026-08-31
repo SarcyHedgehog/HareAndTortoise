@@ -12,6 +12,7 @@ Open `index.html` directly, or use VS Code Live Server. No build step, account, 
 - Independent Hare and Tortoise progression: beat par to unlock the next level on that trail
 - Per-level par and one-, two- and three-star thresholds held in `levels.js`
 - Permanent level geometry that does not consume inventory, including solid green blocks and crate walls
+- Animated fixed black holes that pull in the sphere and fail the attempt
 - Separate Hare and Tortoise course layouts
 - Opposing fastest/longest scoring objectives
 - Placeable, draggable and rotatable platforms, ramps, springs and compact green pipe elbows
