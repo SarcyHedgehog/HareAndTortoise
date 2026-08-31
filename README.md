@@ -34,6 +34,10 @@ This is deliberately a vertical slice rather than a complete game. More worlds, 
 
 Open `editor.html` through the same Live Server as the game. Existing levels can be loaded as starting points. The editor treats the piece counts as pieces available in addition to the starting layout, and exports a single package containing the world reference and canonical level definition. Backgrounds can use the procedural meadow preset or an image URL; the game falls back to the procedural meadow while an image is unavailable.
 
+## Placement grid
+
+Player pieces snap by their centre point to the pinboard grid while they are placed or dragged. The defaults are kept in `config.js`: change `placementGrid.size` to try a different spacing, set `enabled` to `false` to compare free placement, or set `showDots` to `false` to hide the guide. Existing saved layouts retain their original coordinates until an individual piece is moved, so changing the setting does not silently alter old courses.
+
 ## Local saves
 
 Courses, named layouts and personal bests are stored in IndexedDB in the current browser. They survive ordinary refreshes and restarts, but they are deliberately device-local: another browser, phone or web origin has its own save data. In particular, layouts created on a Live Server address will not automatically appear on the eventual production website.
