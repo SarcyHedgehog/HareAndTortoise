@@ -8,11 +8,12 @@ Open `index.html` directly, or use VS Code Live Server. No build step, account, 
 
 ## Included in this pass
 
-- Eight canonical Green Meadows levels, selected from the level strip
-- Independent Hare and Tortoise progression: beat par to unlock the next level on that trail
+- Eight canonical Green Meadows levels and the opening Bounce in Space level, selected from the level strip
+- Independent Hare and Tortoise progression: beat par to unlock the next level and finish a world to open the next world on that trail
 - Per-level par and one-, two- and three-star thresholds held in `levels.js`
 - Permanent level geometry that does not consume inventory, including solid green blocks and crate walls
 - Animated fixed black holes that pull in the sphere and fail the attempt
+- Reusable procedural meadow and star-field space background presets
 - Separate Hare and Tortoise course layouts
 - Opposing fastest/longest scoring objectives
 - Placeable, draggable and rotatable platforms, ramps, springs and compact green pipe elbows
@@ -26,14 +27,14 @@ Open `index.html` directly, or use VS Code Live Server. No build step, account, 
 - Separate personal bests for each trail, including Golden Hedgehog runs
 - Star ratings, synthesized sound and responsive touch controls
 - Landscape-first tablet and phone presentation with a full-size playfield, compact touch shed and portrait rotation prompt
-- Desktop level workshop at `editor.html`, with canvas placement, separate Hare/Tortoise starting layouts, scoring, inventory, background choice, local drafts and JSON import/export
+- Desktop level workshop at `editor.html`, with multi-world loading, canvas placement, shared Hare/Tortoise starting layouts, scoring, inventory, meadow/space/image background choice, local drafts and JSON import/export
 - Clubhouse lobby with separate Hare/Tortoise map progress, per-level overall and Golden Hedgehog group records, a record-holder summary and group create/join/leave/rejoin flows
 
 This is deliberately a vertical slice rather than a complete game. More worlds, editor play-testing and asynchronous challenges belong in later passes.
 
 ## Level workshop
 
-Open `editor.html` through the same Live Server as the game. Existing levels can be loaded as starting points. The editor treats the piece counts as pieces available in addition to the starting layout, and exports a single package containing the world reference and canonical level definition. Backgrounds can use the procedural meadow preset or an image URL; the game falls back to the procedural meadow while an image is unavailable.
+Open `editor.html` through the same Live Server as the game. Existing levels can be loaded as starting points. The editor treats the piece counts as pieces available in addition to the starting layout, and exports a single package containing the world reference and canonical level definition. Backgrounds can use the procedural meadow preset, the reusable black-space star field, or an image URL; image levels fall back to their procedural theme while the image is unavailable.
 
 The canonical starting layout is shared by the Hare and Tortoise. Their timing rules, progress and player-edited courses remain independent, but both trails always begin with the same designed map. The editor imports older version-1 packages containing separate `starter.hare` and `starter.tortoise` arrays and converts them to one shared layout on export.
 
